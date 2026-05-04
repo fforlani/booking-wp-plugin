@@ -52,7 +52,7 @@ class Booking_Availability {
 	}
 
 	/**
-	 * Get all available dates in range
+	 * Get all available dates in range with at least one free slot
 	 */
 	public static function get_available_dates() {
 		$range = Booking_Settings::get_date_range();
@@ -64,7 +64,12 @@ class Booking_Availability {
 		for ( $current = $start; $current <= $end; $current += DAY_IN_SECONDS ) {
 			$date = date( 'Y-m-d', $current );
 
-			if ( ! Booking_Settings::is_date_blocked( $date ) ) {
+			if ( Booking_Settings::is_date_blocked( $date ) ) {
+				continue;
+			}
+
+			$slots = self::get_available_slots_for_date( $date );
+			if ( ! empty( $slots ) ) {
 				$dates[] = $date;
 			}
 		}

@@ -73,6 +73,21 @@ class Booking_Admin {
 	}
 
 	/**
+	 * Sanitize blocked specific dates from textarea (convert string to array)
+	 */
+	public static function sanitize_blocked_specific_dates( $value ) {
+		if ( is_array( $value ) ) {
+			return array_filter( array_map( 'sanitize_text_field', $value ) );
+		}
+
+		// Convert newline-separated string to array
+		$dates = array_map( 'trim', explode( "\n", $value ) );
+		$dates = array_filter( $dates ); // Remove empty lines
+
+		return array_map( 'sanitize_text_field', $dates );
+	}
+
+	/**
 	 * Register settings
 	 */
 	public static function register_settings() {
@@ -83,18 +98,27 @@ class Booking_Admin {
 		register_setting( 'booking_system_group', 'booking_system_slot_duration_minutes' );
 		register_setting( 'booking_system_group', 'booking_system_max_reservations_per_slot' );
 		register_setting( 'booking_system_group', 'booking_system_blocked_weekdays' );
-		register_setting( 'booking_system_group', 'booking_system_blocked_specific_dates' );
+		register_setting( 
+			'booking_system_group', 
+			'booking_system_blocked_specific_dates',
+			array(
+				'sanitize_callback' => array( __CLASS__, 'sanitize_blocked_specific_dates' ),
+				'type'              => 'array'
+			)
+		);
 		register_setting( 'booking_system_group', 'booking_system_booking_timezone' );
 		register_setting( 'booking_system_group', 'booking_system_admin_email_on_booking' );
 		register_setting( 'booking_system_group', 'booking_system_send_confirmation_email' );
 		register_setting( 'booking_system_group', 'booking_system_google_calendar_enabled' );
 		register_setting( 'booking_system_group', 'booking_system_google_calendar_id' );
-		register_setting( 'booking_system_group', 'booking_system_enable_recaptcha' );
+		register_setting('booking_system_group', 'booking_system_rate_limit_enabled');
+		register_setting('booking_system_group', 'booking_system_rate_limit_attempts');
+/* 		register_setting( 'booking_system_group', 'booking_system_enable_recaptcha' );
 		register_setting( 'booking_system_group', 'booking_system_recaptcha_site_key' );
-		register_setting( 'booking_system_group', 'booking_system_recaptcha_secret_key' );
+		register_setting( 'booking_system_group', 'booking_system_recaptcha_secret_key' ); */
 
 		// Handle Google credentials upload
-		if ( isset( $_POST['booking_upload_credentials_nonce'] ) ) {
+		if ( isset( $_POST['booking_upload_credentials_nonce'] )) {
 			self::handle_google_credentials_upload();
 		}
 	}
@@ -118,7 +142,7 @@ class Booking_Admin {
 		if ( ! isset( $_FILES['booking_credentials_file'] ) || empty( $_FILES['booking_credentials_file']['name'] ) ) {
 			set_transient( 'booking_upload_error', 'Nessun file selezionato', 10 );
 			wp_redirect( admin_url( 'admin.php?page=booking-system' ) );
-			exit;
+			return;
 		}
 
 		$file = $_FILES['booking_credentials_file'];
@@ -127,7 +151,7 @@ class Booking_Admin {
 		if ( $file['error'] !== UPLOAD_ERR_OK ) {
 			set_transient( 'booking_upload_error', 'Errore nel caricamento del file: ' . $file['error'], 10 );
 			wp_redirect( admin_url( 'admin.php?page=booking-system' ) );
-			exit;
+			return;
 		}
 
 		// Check file type
@@ -136,14 +160,14 @@ class Booking_Admin {
 		if ( ! in_array( $file_type, $allowed_types ) ) {
 			set_transient( 'booking_upload_error', 'Il file deve essere in formato JSON', 10 );
 			wp_redirect( admin_url( 'admin.php?page=booking-system' ) );
-			exit;
+			return;
 		}
 
 		// Check file size (max 1MB)
 		if ( $file['size'] > 1048576 ) {
 			set_transient( 'booking_upload_error', 'Il file è troppo grande (max 1MB)', 10 );
 			wp_redirect( admin_url( 'admin.php?page=booking-system' ) );
-			exit;
+			return;
 		}
 
 		// Read and validate JSON
@@ -153,7 +177,7 @@ class Booking_Admin {
 		if ( ! $credentials || ! isset( $credentials['type'] ) || $credentials['type'] !== 'service_account' ) {
 			set_transient( 'booking_upload_error', 'File credenziali non valido. Deve essere un file service account JSON di Google', 10 );
 			wp_redirect( admin_url( 'admin.php?page=booking-system' ) );
-			exit;
+			return;
 		}
 
 		// Save credentials
@@ -165,7 +189,7 @@ class Booking_Admin {
 		}
 
 		wp_redirect( admin_url( 'admin.php?page=booking-system' ) );
-		exit;
+		return;
 	}
 
 	/**
@@ -214,11 +238,11 @@ class Booking_Admin {
 				<a href="#tab-security" class="nav-tab">Sicurezza</a>
 			</h2>
 
-			<!-- General Settings Tab -->
-			<div id="tab-general" class="tab-content active">
-				<form method="post" action="options.php">
-					<?php settings_fields( 'booking_system_group' ); ?>
+			<form method="post" action="options.php">
+				<?php settings_fields( 'booking_system_group' ); ?>
 
+				<!-- General Settings Tab -->
+				<div id="tab-general" class="tab-content active">
 					<h3>Configurazione Base</h3>
 					<table class="form-table">
 						<tr>
@@ -226,7 +250,7 @@ class Booking_Admin {
 								<label for="availability_start_date">Data Inizio Disponibilità:</label>
 							</th>
 							<td>
-								<input type="date" id="availability_start_date" name="booking_system_availability_start_date" value="<?php echo esc_attr( $settings['availability_start_date'] ); ?>" required />
+								<input type="date" id="availability_start_date" name="booking_system_availability_start_date" value="<?php echo esc_attr( $settings['availability_start_date'] ); ?>" />
 								<p class="description">Data da cui iniziano le prenotazioni (es: 3 giugno 2026)</p>
 							</td>
 						</tr>
@@ -235,7 +259,7 @@ class Booking_Admin {
 								<label for="availability_end_date">Data Fine Disponibilità:</label>
 							</th>
 							<td>
-								<input type="date" id="availability_end_date" name="booking_system_availability_end_date" value="<?php echo esc_attr( $settings['availability_end_date'] ); ?>" required />
+								<input type="date" id="availability_end_date" name="booking_system_availability_end_date" value="<?php echo esc_attr( $settings['availability_end_date'] ); ?>" />
 								<p class="description">Data fino a cui è possibile prenotare (es: 18 settembre 2026)</p>
 							</td>
 						</tr>
@@ -248,7 +272,7 @@ class Booking_Admin {
 								<label for="first_slot_time">Primo Slot Orario:</label>
 							</th>
 							<td>
-								<input type="time" id="first_slot_time" name="booking_system_first_slot_time" value="<?php echo esc_attr( $settings['first_slot_time'] ); ?>" required />
+								<input type="time" id="first_slot_time" name="booking_system_first_slot_time" value="<?php echo esc_attr( $settings['first_slot_time'] ); ?>" />
 								<p class="description">Orario di inizio della giornata (es: 09:00)</p>
 							</td>
 						</tr>
@@ -257,7 +281,7 @@ class Booking_Admin {
 								<label for="last_slot_time">Ultimo Slot Orario:</label>
 							</th>
 							<td>
-								<input type="time" id="last_slot_time" name="booking_system_last_slot_time" value="<?php echo esc_attr( $settings['last_slot_time'] ); ?>" required />
+								<input type="time" id="last_slot_time" name="booking_system_last_slot_time" value="<?php echo esc_attr( $settings['last_slot_time'] ); ?>" />
 								<p class="description">Orario di fine della giornata (es: 17:00)</p>
 							</td>
 						</tr>
@@ -266,7 +290,7 @@ class Booking_Admin {
 								<label for="slot_duration_minutes">Durata Slot (minuti):</label>
 							</th>
 							<td>
-								<input type="number" id="slot_duration_minutes" name="booking_system_slot_duration_minutes" value="<?php echo esc_attr( $settings['slot_duration_minutes'] ); ?>" min="15" step="15" required />
+								<input type="number" id="slot_duration_minutes" name="booking_system_slot_duration_minutes" value="<?php echo esc_attr( $settings['slot_duration_minutes'] ); ?>" min="15" step="15" />
 								<p class="description">Durata di ogni fascia oraria (es: 60 minuti = 1 ora)</p>
 							</td>
 						</tr>
@@ -279,7 +303,7 @@ class Booking_Admin {
 								<label for="max_reservations_per_slot">Max Prenotazioni per Slot:</label>
 							</th>
 							<td>
-								<input type="number" id="max_reservations_per_slot" name="booking_system_max_reservations_per_slot" value="<?php echo esc_attr( $settings['max_reservations_per_slot'] ); ?>" min="1" required />
+								<input type="number" id="max_reservations_per_slot" name="booking_system_max_reservations_per_slot" value="<?php echo esc_attr( $settings['max_reservations_per_slot'] ); ?>" min="1" />
 								<p class="description">Numero massimo di prenotazioni per fascia oraria (es: 2)</p>
 							</td>
 						</tr>
@@ -322,16 +346,10 @@ class Booking_Admin {
 							</td>
 						</tr>
 					</table>
+				</div>
 
-					<?php submit_button(); ?>
-				</form>
-			</div>
-
-			<!-- Blocked Dates Tab -->
-			<div id="tab-blocked-dates" class="tab-content">
-				<form method="post" action="options.php">
-					<?php settings_fields( 'booking_system_group' ); ?>
-
+				<!-- Blocked Dates Tab -->
+				<div id="tab-blocked-dates" class="tab-content">
 					<h3>Giorni della Settimana Bloccati</h3>
 					<table class="form-table">
 						<tr>
@@ -361,16 +379,10 @@ class Booking_Admin {
 							</td>
 						</tr>
 					</table>
+				</div>
 
-					<?php submit_button(); ?>
-				</form>
-			</div>
-
-			<!-- Google Calendar Tab -->
-			<div id="tab-google" class="tab-content">
-				<form method="post" action="options.php">
-					<?php settings_fields( 'booking_system_group' ); ?>
-
+				<!-- Google Calendar Tab -->
+				<div id="tab-google" class="tab-content">
 					<h3>Configurazione Google Calendar</h3>
 					<table class="form-table">
 						<tr>
@@ -393,52 +405,45 @@ class Booking_Admin {
 						</tr>
 					</table>
 
-					<?php submit_button(); ?>
-				</form>
+					<h3>Credenziali Google (Service Account)</h3>
+					<?php if ( self::has_google_credentials() ) { ?>
+						<div class="notice notice-success">
+							<p>✓ Le credenziali Google sono state salvate correttamente</p>
+						</div>
+					<?php } else { ?>
+						<div class="notice notice-info">
+							<p>Per abilitare la sincronizzazione con Google Calendar, devi caricare le credenziali OAuth 2.0.</p>
+						</div>
+					<?php } ?>
 
-				<h3>Credenziali Google (Service Account)</h3>
-				<?php if ( self::has_google_credentials() ) { ?>
-					<div class="notice notice-success">
-						<p>✓ Le credenziali Google sono state salvate correttamente</p>
-					</div>
-				<?php } else { ?>
-					<div class="notice notice-info">
-						<p>Per abilitare la sincronizzazione con Google Calendar, devi caricare le credenziali OAuth 2.0.</p>
-					</div>
-				<?php } ?>
+					<p>Per configurare Google Calendar:</p>
+					<ol>
+						<li>Vai a <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+						<li>Crea un nuovo progetto e abilita l'API Google Calendar</li>
+						<li>Crea un Service Account e scarica il file JSON delle credenziali</li>
+						<li>Carica il file JSON qui sotto</li>
+					</ol>
 
-				<p>Per configurare Google Calendar:</p>
-				<ol>
-					<li>Vai a <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
-					<li>Crea un nuovo progetto e abilita l'API Google Calendar</li>
-					<li>Crea un Service Account e scarica il file JSON delle credenziali</li>
-					<li>Carica il file JSON qui sotto</li>
-				</ol>
-
-				<form method="post" enctype="multipart/form-data" class="booking-google-upload-form">
-					<?php wp_nonce_field( 'booking_upload_credentials', 'booking_upload_credentials_nonce' ); ?>
 					<table class="form-table">
 						<tr>
 							<th scope="row">
 								<label for="booking_credentials_file">Carica Credenziali JSON:</label>
 							</th>
 							<td>
-								<input type="file" id="booking_credentials_file" name="booking_credentials_file" accept=".json" required />
+								<?php wp_nonce_field( 'booking_upload_credentials', 'booking_upload_credentials_nonce' ); ?>
+								<input type="file" id="booking_credentials_file" name="booking_credentials_file" accept=".json" />
 								<p class="description">Carica il file JSON delle credenziali Google Service Account</p>
-								<button type="submit" class="button button-primary" style="margin-top: 10px;">Carica Credenziali</button>
+								<button type="button" id="btn-upload-credentials" class="button button-primary" style="margin-top: 10px;">Carica Credenziali</button>
+								<span id="upload-status" style="margin-left: 10px; display: none;"></span>
 							</td>
 						</tr>
 					</table>
-				</form>
 
-				<p><strong>Documentazione:</strong> Vedi il file README.md nella cartella assets per istruzioni dettagliate</p>
-			</div>
+					<p><strong>Documentazione:</strong> Vedi il file README.md nella cartella assets per istruzioni dettagliate</p>
+				</div>
 
-			<!-- Security Tab -->
-			<div id="tab-security" class="tab-content">
-				<form method="post" action="options.php">
-					<?php settings_fields( 'booking_system_group' ); ?>
-
+				<!-- Security Tab -->
+				<div id="tab-security" class="tab-content">
 					<h3>Protezione Rate Limiting</h3>
 					<table class="form-table">
 						<tr>
@@ -446,7 +451,7 @@ class Booking_Admin {
 								<label for="rate_limit_enabled">Abilita Rate Limiting:</label>
 							</th>
 							<td>
-								<input type="checkbox" id="rate_limit_enabled" name="booking_system_rate_limit_enabled" value="1" checked />
+								<input type="checkbox" id="rate_limit_enabled" name="booking_system_rate_limit_enabled" value="1" <?php checked( get_option( 'booking_system_rate_limit_enabled' ) ); ?> />
 								<p class="description">Limita il numero di richieste per prevenire brute force e DoS (raccomandato: sempre abilitato)</p>
 							</td>
 						</tr>
@@ -455,13 +460,14 @@ class Booking_Admin {
 								<label for="rate_limit_attempts">Max Tentativi per Ora:</label>
 							</th>
 							<td>
-								<input type="number" id="rate_limit_attempts" name="booking_system_rate_limit_attempts" value="5" min="1" max="100" />
+								<input type="number" id="rate_limit_attempts" name="booking_system_rate_limit_attempts" value="<?php echo esc_attr( $settings['rate_limit_attempts'] ); ?>" min="1" max="100" />
 								<p class="description">Numero massimo di richieste permesse per ora da un IP</p>
 							</td>
 						</tr>
 					</table>
 
-					<h3>Protezione reCAPTCHA v3</h3>
+					<!-- To be implemented in frontend if needed-->
+					<!-- <h3>Protezione reCAPTCHA v3</h3>
 					<div class="notice notice-info">
 						<p><strong>reCAPTCHA v3</strong> protegge dal bot senza richiedere interazione dell'utente. Per configurarlo:</p>
 						<ol>
@@ -499,10 +505,10 @@ class Booking_Admin {
 								<p class="description" style="color: #d63638;">⚠️ Non condividere questa chiave. Mantienila segreta!</p>
 							</td>
 						</tr>
-					</table>
+					</table> -->
 
 					<h3>Info Sicurezza</h3>
-					<div class="notice notice-info" style="margin-top: 20px;">
+					<div style="margin-top: 20px;">
 						<p><strong>Misure di sicurezza attive:</strong></p>
 						<ul style="margin-left: 20px;">
 							<li>✓ Validazione input lato server</li>
@@ -516,10 +522,10 @@ class Booking_Admin {
 							<li>✓ Logging di tutte le azioni</li>
 						</ul>
 					</div>
+				</div>
 
-					<?php submit_button(); ?>
-				</form>
-			</div>
+				<?php submit_button(); ?>
+			</form>
 		</div>
 
 		<script>
@@ -531,6 +537,55 @@ class Booking_Admin {
 					$('.tab-content').removeClass('active');
 					$(this).addClass('nav-tab-active');
 					$(tab).addClass('active');
+				});
+
+				// Handle Google Credentials Upload via AJAX
+				$('#btn-upload-credentials').on('click', function(e) {
+					e.preventDefault();
+					
+					const fileInput = document.getElementById('booking_credentials_file');
+					const file = fileInput.files[0];
+					const statusEl = $('#upload-status');
+					
+					if (!file) {
+						statusEl.html('<span style="color: #d63638;">Seleziona un file JSON</span>').show();
+						return;
+					}
+					
+					if (file.type !== 'application/json') {
+						statusEl.html('<span style="color: #d63638;">Il file deve essere JSON</span>').show();
+						return;
+					}
+					
+					if (file.size > 1048576) {
+						statusEl.html('<span style="color: #d63638;">File troppo grande (max 1MB)</span>').show();
+						return;
+					}
+					
+					// Create FormData manually without form element
+					const formData = new FormData();
+					formData.append('booking_credentials_file', file);
+					formData.append('booking_upload_credentials_nonce', $('[name="booking_upload_credentials_nonce"]').val());
+					
+					statusEl.html('<span style="color: #0073aa;">Caricamento in corso...</span>').show();
+					
+					$.ajax({
+						type: 'POST',
+						url: window.location.href,
+						data: formData,
+						processData: false,
+						contentType: false,
+						success: function(response) {
+							statusEl.html('<span style="color: #28a745;">✓ Credenziali caricate con successo!</span>').show();
+							fileInput.value = '';
+							setTimeout(function() {
+								location.reload();
+							}, 1500);
+						},
+						error: function(xhr, status, error) {
+							statusEl.html('<span style="color: #d63638;">Errore nel caricamento</span>').show();
+						}
+					});
 				});
 			});
 		</script>
@@ -563,101 +618,6 @@ class Booking_Admin {
 	}
 
 	/**
-	 * Render security settings (within settings page)
-	 */
-	public static function render_security_tab() {
-		$settings = Booking_Settings::get_all();
-		?>
-		<!-- Security Tab -->
-		<div id="tab-security" class="tab-content">
-			<form method="post" action="options.php">
-				<?php settings_fields( 'booking_system_group' ); ?>
-
-				<h3>Protezione Rate Limiting</h3>
-				<table class="form-table">
-					<tr>
-						<th scope="row">
-							<label for="rate_limit_enabled">Abilita Rate Limiting:</label>
-						</th>
-						<td>
-							<input type="checkbox" id="rate_limit_enabled" name="booking_system_rate_limit_enabled" value="1" checked />
-							<p class="description">Limita il numero di richieste per prevenire brute force e DoS (raccomandato: sempre abilitato)</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="rate_limit_attempts">Max Tentativi per Ora:</label>
-						</th>
-						<td>
-							<input type="number" id="rate_limit_attempts" name="booking_system_rate_limit_attempts" value="5" min="1" max="100" />
-							<p class="description">Numero massimo di richieste permesse per ora da un IP</p>
-						</td>
-					</tr>
-				</table>
-
-				<h3>Protezione reCAPTCHA v3</h3>
-				<div class="notice notice-info">
-					<p><strong>reCAPTCHA v3</strong> protegge dal bot senza richiedere interazione dell'utente. Per configurarlo:</p>
-					<ol>
-						<li>Vai a <a href="https://www.google.com/recaptcha/admin" target="_blank">Google reCAPTCHA Admin Console</a></li>
-						<li>Crea un nuovo sito reCAPTCHA v3</li>
-						<li>Copia Site Key e Secret Key qui sotto</li>
-					</ol>
-				</div>
-
-				<table class="form-table">
-					<tr>
-						<th scope="row">
-							<label for="enable_recaptcha">Abilita reCAPTCHA:</label>
-						</th>
-						<td>
-							<input type="checkbox" id="enable_recaptcha" name="booking_system_enable_recaptcha" value="1" <?php checked( get_option( 'booking_system_enable_recaptcha' ) ); ?> />
-							<p class="description">Abilita la protezione reCAPTCHA v3 sul form di prenotazione</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="recaptcha_site_key">Site Key reCAPTCHA:</label>
-						</th>
-						<td>
-							<input type="text" id="recaptcha_site_key" name="booking_system_recaptcha_site_key" value="<?php echo esc_attr( get_option( 'booking_system_recaptcha_site_key' ) ); ?>" placeholder="6Lc_..." style="width: 100%; font-family: monospace;" />
-							<p class="description">La chiave pubblica di reCAPTCHA (visibile lato client)</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="recaptcha_secret_key">Secret Key reCAPTCHA:</label>
-						</th>
-						<td>
-							<input type="password" id="recaptcha_secret_key" name="booking_system_recaptcha_secret_key" value="<?php echo esc_attr( get_option( 'booking_system_recaptcha_secret_key' ) ); ?>" placeholder="6Lc_..." style="width: 100%; font-family: monospace;" />
-							<p class="description" style="color: #d63638;">⚠️ Non condividere questa chiave. Mantienila segreta!</p>
-						</td>
-					</tr>
-				</table>
-
-				<h3>Info Sicurezza</h3>
-				<div class="notice notice-info" style="margin-top: 20px;">
-					<p><strong>Misure di sicurezza attive:</strong></p>
-					<ul style="margin-left: 20px;">
-						<li>✓ Validazione input lato server</li>
-						<li>✓ Protezione SQL Injection (prepared statements)</li>
-						<li>✓ Protezione CSRF (NONCE tokens)</li>
-						<li>✓ Protezione XSS (output escaping)</li>
-						<li>✓ Transazioni atomiche (prevenzione race conditions)</li>
-						<li>✓ Rate limiting per IP</li>
-						<li>✓ Sanitizzazione email, telefono, nomi</li>
-						<li>✓ Controllo credenziali Google (file upload validation)</li>
-						<li>✓ Logging di tutte le azioni</li>
-					</ul>
-				</div>
-
-				<?php submit_button(); ?>
-			</form>
-		</div>
-		<?php
-	}
-
-	/**
 	 * Render bookings page
 	 */
 	public static function render_bookings_page() {
@@ -681,6 +641,7 @@ class Booking_Admin {
 					<tr>
 						<th>ID</th>
 						<th>Nome</th>
+						<th>Sezione</th>
 						<th>Email</th>
 						<th>Data</th>
 						<th>Orario</th>
@@ -694,6 +655,7 @@ class Booking_Admin {
 						<tr>
 							<td><?php echo esc_html( $booking->id ); ?></td>
 							<td><?php echo esc_html( $booking->client_name . ' ' . $booking->client_surname ); ?></td>
+							<td><?php echo esc_html( $booking->client_section ); ?></td>
 							<td><?php echo esc_html( $booking->client_email ); ?></td>
 							<td><?php echo esc_html( date_i18n( 'd/m/Y', strtotime( $booking->booking_date ) ) ); ?></td>
 							<td><?php echo esc_html( $booking->time_slot ); ?></td>

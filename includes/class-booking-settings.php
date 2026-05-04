@@ -75,6 +75,15 @@ class Booking_Settings {
 	public static function get_timezone() {
 		return self::get( 'booking_timezone', 'Europe/Rome' );
 	}
+	
+	public static function is_send_confirm_email() {
+		return (bool) self::get( 'send_confirmation_email', false );
+	}
+	
+	public static function is_send_admin_notification_email() {
+		return (bool) self::get( 'admin_email_on_booking', false );
+	}
+
 
 	/**
 	 * Get availability date range

@@ -20,6 +20,17 @@ class Booking_REST_API {
 	 * Register REST API routes
 	 */
 	public static function register_routes() {
+		// Get available dates endpoint
+		register_rest_route(
+			'booking/v1',
+			'/dates',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( __CLASS__, 'get_available_dates' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
 		// Get available slots endpoint
 		register_rest_route(
 			'booking/v1',
@@ -40,6 +51,23 @@ class Booking_REST_API {
 				'callback'            => array( __CLASS__, 'create_reservation' ),
 				'permission_callback' => '__return_true',
 			)
+		);
+	}
+
+	/**
+	 * Get available dates with at least one available slot
+	 */
+	public static function get_available_dates( $request ) {
+		$rate_limit_check = Booking_Security::check_rate_limit();
+		if ( is_wp_error( $rate_limit_check ) ) {
+			Booking_Logger::log_action( null, 'rate_limit_exceeded', 'Rate limit hit on GET /dates', Booking_Security::get_client_ip() );
+			return new WP_Error( 'rate_limit_exceeded', 'Troppi tentativi. Riprova più tardi.', array( 'status' => 429 ) );
+		}
+
+		$dates = Booking_Availability::get_available_dates();
+
+		return array(
+			'dates' => $dates,
 		);
 	}
 
@@ -81,11 +109,11 @@ class Booking_REST_API {
 		}
 
 		// Verify nonce
-		$nonce = $request->get_header( 'X-WP-Nonce' );
+		/* $nonce = $request->get_header( 'X-WP-Nonce' );
 		if ( ! wp_verify_nonce( $nonce, 'booking_nonce' ) ) {
 			Booking_Security::increment_rate_limit();
 			return new WP_Error( 'invalid_nonce', 'Invalid nonce', array( 'status' => 403 ) );
-		}
+		} */
 
 		// Verify reCAPTCHA if configured
 		$recaptcha_token = $request->get_param( 'recaptcha_token' );
@@ -108,6 +136,7 @@ class Booking_REST_API {
 			'time_slot'      => isset( $data['time_slot'] ) ? sanitize_text_field( $data['time_slot'] ) : '',
 			'client_name'    => isset( $data['client_name'] ) ? Booking_Security::sanitize_name( $data['client_name'] ) : '',
 			'client_surname' => isset( $data['client_surname'] ) ? Booking_Security::sanitize_name( $data['client_surname'] ) : '',
+			'client_section' => isset( $data['client_section'] ) ? (int)( $data['client_section'] ) : '',
 			'client_email'   => isset( $data['client_email'] ) ? Booking_Security::sanitize_email( $data['client_email'] ) : '',
 			'client_phone'   => isset( $data['client_phone'] ) ? Booking_Security::sanitize_phone( $data['client_phone'] ) : '',
 		);
@@ -129,6 +158,10 @@ class Booking_REST_API {
 
 		if ( ! $sanitized_data['client_surname'] ) {
 			$validation_errors[] = 'Cognome non valido';
+		}
+
+		if ( ! $sanitized_data['client_section'] ) {
+			$validation_errors[] = 'Sezione non valida';
 		}
 
 		if ( ! $sanitized_data['client_email'] ) {
@@ -155,16 +188,22 @@ class Booking_REST_API {
 		}
 
 		// Send confirmation email
-		Booking_Email::send_confirmation( $booking_id );
+		if(Booking_Settings::is_send_confirm_email()) {
+			Booking_Email::send_confirmation( $booking_id );
+		}
 
 		// Send admin notification
-		Booking_Email::send_admin_notification( $booking_id );
+		if(Booking_Settings::is_send_admin_notification_email()) {
+			Booking_Email::send_admin_notification( $booking_id );
+		}
 
 		// Add to Google Calendar
-		Booking_Google_Calendar::add_event( $booking_id );
+		if (Booking_Settings::get( 'google_calendar_enabled' ) ) {
+			Booking_Google_Calendar::add_event( $booking_id );
+		}
 
 		// Reset rate limit on successful booking
-		Booking_Security::reset_rate_limit();
+		// Booking_Security::reset_rate_limit();
 
 		$booking = Booking_DB::get_booking( $booking_id );
 

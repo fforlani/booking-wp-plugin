@@ -10,13 +10,30 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Booking_Security {
 
 	const RATE_LIMIT_TRANSIENT = 'booking_rate_limit_';
-	const RATE_LIMIT_ATTEMPTS = 5;
-	const RATE_LIMIT_WINDOW = 3600; // 1 hour
+
+	/**
+	 * Check if rate limiting is enabled
+	 */
+	public static function is_rate_limit_enabled() {
+		return (bool) Booking_Settings::get( 'rate_limit_enabled', true );
+	}
+
+	/**
+	 * Get rate limit attempts from settings
+	 */
+	public static function get_rate_limit_attempts() {
+		return (int) Booking_Settings::get( 'rate_limit_attempts', 5 );
+	}
 
 	/**
 	 * Check rate limit for IP
 	 */
 	public static function check_rate_limit( $ip = null ) {
+		// Check if rate limiting is enabled
+		if ( ! self::is_rate_limit_enabled() ) {
+			return true;
+		}
+
 		if ( ! $ip ) {
 			$ip = self::get_client_ip();
 		}
@@ -28,7 +45,9 @@ class Booking_Security {
 			$attempts = 0;
 		}
 
-		if ( $attempts >= self::RATE_LIMIT_ATTEMPTS ) {
+		$max_attempts = self::get_rate_limit_attempts();
+
+		if ( $attempts >= $max_attempts ) {
 			return new WP_Error( 'rate_limit_exceeded', 'Troppi tentativi. Riprova più tardi.' );
 		}
 
@@ -39,6 +58,11 @@ class Booking_Security {
 	 * Increment rate limit counter
 	 */
 	public static function increment_rate_limit( $ip = null ) {
+		// Only track if rate limiting is enabled
+		if ( ! self::is_rate_limit_enabled() ) {
+			return;
+		}
+
 		if ( ! $ip ) {
 			$ip = self::get_client_ip();
 		}
@@ -51,7 +75,8 @@ class Booking_Security {
 		}
 
 		$attempts++;
-		set_transient( $transient_key, $attempts, self::RATE_LIMIT_WINDOW );
+		$window = 3600; // attempts window in seconds (1 hour)
+		set_transient( $transient_key, $attempts, $window );
 	}
 
 	/**

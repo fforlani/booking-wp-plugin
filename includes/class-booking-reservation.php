@@ -16,7 +16,7 @@ class Booking_Reservation {
 		$errors = array();
 
 		// Required fields
-		$required_fields = array( 'booking_date', 'time_slot', 'client_name', 'client_surname', 'client_email', 'client_phone' );
+		$required_fields = array( 'booking_date', 'time_slot', 'client_name', 'client_surname', 'client_email', 'client_phone', 'client_section' );
 		foreach ( $required_fields as $field ) {
 			if ( empty( $data[ $field ] ) ) {
 				$errors[] = "Campo obbligatorio: {$field}";

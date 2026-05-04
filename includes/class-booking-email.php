@@ -8,6 +8,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Booking_Email {
+	static $smtp_initialized = false;
+
+	private static function init_smtp() {
+		add_action('phpmailer_init', function($phpmailer) {
+			$phpmailer->isSMTP();
+			$phpmailer->Host = 'smtp.gmail.com';
+			$phpmailer->SMTPAuth = true;
+			$phpmailer->Port = 587;
+			$phpmailer->Username = 'fediforla@gmail.com';
+			$phpmailer->Password = 'qvjx grdp ebwi ivuk';
+			$phpmailer->SMTPSecure = 'tls';
+		});
+
+		add_filter('wp_mail_from', function() {
+			return 'fediforla@gmail.com';
+		});
+	}
 
 	/**
 	 * Send confirmation email to client
@@ -20,8 +37,13 @@ class Booking_Email {
 			return false;
 		}
 
+		if( !Booking_Email::$smtp_initialized ) {
+			Booking_Email::init_smtp();
+			Booking_Email::$smtp_initialized = true;
+		}
+
 		$to = $booking->client_email;
-		$subject = self::get_subject();
+		$subject = 'Conferma Prenotazione';
 		$message = self::get_message( $booking );
 		$headers = self::get_headers();
 
@@ -37,13 +59,6 @@ class Booking_Email {
 	}
 
 	/**
-	 * Get email subject
-	 */
-	private static function get_subject() {
-		return 'Conferma Prenotazione';
-	}
-
-	/**
 	 * Get email message
 	 */
 	private static function get_message( $booking ) {
@@ -53,6 +68,7 @@ class Booking_Email {
 		$message .= "Data: " . date_i18n( 'd/m/Y', strtotime( $booking->booking_date ) ) . "\n";
 		$message .= "Orario: {$booking->time_slot}\n";
 		$message .= "Nome: {$booking->client_name} {$booking->client_surname}\n";
+		$message .= "Sezione: {$booking->client_section}\n";
 		$message .= "Email: {$booking->client_email}\n";
 		$message .= "Telefono: {$booking->client_phone}\n\n";
 		$message .= "Grazie per la tua prenotazione!\n\n";
@@ -85,10 +101,16 @@ class Booking_Email {
 			return false;
 		}
 
+		if( !Booking_Email::$smtp_initialized ) {
+			Booking_Email::init_smtp();
+			Booking_Email::$smtp_initialized = true;
+		}
+
 		$admin_email = get_option( 'admin_email' );
 		$subject = 'Nuova prenotazione ricevuta';
 		$message = "Una nuova prenotazione è stata ricevuta:\n\n";
 		$message .= "Nome: {$booking->client_name} {$booking->client_surname}\n";
+		$message .= "Sezione: {$booking->client_section}\n";
 		$message .= "Email: {$booking->client_email}\n";
 		$message .= "Telefono: {$booking->client_phone}\n";
 		$message .= "Data: " . date_i18n( 'd/m/Y', strtotime( $booking->booking_date ) ) . "\n";

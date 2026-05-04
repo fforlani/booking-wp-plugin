@@ -64,7 +64,8 @@ class Booking_Shortcode {
 			<form id="booking-form" class="booking-form">
 				<div class="form-group">
 					<label for="booking-date">Data:</label>
-					<input type="date" id="booking-date" name="booking_date" required />
+					<input type="date" id="booking-date" name="booking_date" list="booking-date-options" required />
+					<datalist id="booking-date-options"></datalist>
 				</div>
 
 				<div class="form-group">
@@ -75,22 +76,34 @@ class Booking_Shortcode {
 				</div>
 
 				<div class="form-group">
-					<label for="client-name">Nome:</label>
+					<label for="client-name">Nome dell'alunno *:</label>
 					<input type="text" id="client-name" name="client_name" required />
 				</div>
 
 				<div class="form-group">
-					<label for="client-surname">Cognome:</label>
+					<label for="client-surname">Cognome dell'alunno *:</label>
 					<input type="text" id="client-surname" name="client_surname" required />
 				</div>
 
 				<div class="form-group">
-					<label for="client-email">Email:</label>
+					<label for="client-section">Futura sezione *:</label>
+					<select id="client-section" name="client_section" required >
+						<option disabled selected value="">Seleziona</option>
+						<option value="1">1ª</option>
+						<option value="2">2ª</option>
+						<option value="3">3ª</option>
+						<option value="4">4ª</option>
+						<option value="5">5ª</option>
+					</select>
+				</div>
+
+				<div class="form-group">
+					<label for="client-email">Email *:</label>
 					<input type="email" id="client-email" name="client_email" required />
 				</div>
 
 				<div class="form-group">
-					<label for="client-phone">Telefono:</label>
+					<label for="client-phone">Cellulare del genitore *:</label>
 					<input type="tel" id="client-phone" name="client_phone" required />
 				</div>
 

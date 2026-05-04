@@ -17,9 +17,6 @@ class Booking_Google_Calendar {
 	 * Add event to Google Calendar
 	 */
 	public static function add_event( $booking_id ) {
-		if ( ! Booking_Settings::get( 'google_calendar_enabled' ) ) {
-			return true;
-		}
 
 		$booking = Booking_DB::get_booking( $booking_id );
 		if ( ! $booking ) {
@@ -84,18 +81,17 @@ class Booking_Google_Calendar {
 	private static function create_event_data( $booking ) {
 		$date = $booking->booking_date;
 		$time = $booking->time_slot;
-
+		$slot_duration = intval( Booking_Settings::get( 'slot_duration_minutes', 60 ) );
+		$timezone = new DateTimeZone(Booking_Settings::get_timezone());
+		
 		// Create start and end times
-		$start_datetime = "{$date}T{$time}:00";
-		$end_time = date( 'H:i', strtotime( $time . ' + 1 hour' ) );
-		$end_datetime = "{$date}T{$end_time}:00";
-
-		// Get timezone
-		$timezone = Booking_Settings::get_timezone();
+		$start_datetime = (new DateTime("{$date} {$time}", $timezone))->format("Y-m-d\\TH:i:sP");
+		$end_time = date( 'H:i', strtotime( $time . " + {$slot_duration} minutes" ) );
+		$end_datetime = (new DateTime("{$date} {$end_time}", $timezone))->format("Y-m-d\\TH:i:sP");
 
 		$event = array(
 			'summary'     => "Prenotazione - {$booking->client_name} {$booking->client_surname}",
-			'description' => "Prenotazione di {$booking->client_name} {$booking->client_surname}\nEmail: {$booking->client_email}\nTelefono: {$booking->client_phone}",
+			'description' => "Prenotazione di {$booking->client_name} {$booking->client_surname}\nEmail: {$booking->client_email}\nTelefono: {$booking->client_phone}\nSezione: {$booking->client_section}",
 			'start'       => array(
 				'dateTime' => $start_datetime,
 				'timeZone' => $timezone,
@@ -114,8 +110,9 @@ class Booking_Google_Calendar {
 	 */
 	private static function get_access_token() {
 		$token = get_option( self::ACCESS_TOKEN_OPTION );
+		$expiry = get_option(self::ACCESS_TOKEN_OPTION . '_expiry');
 
-		if ( $token ) {
+		if ( $token && $expiry > time()) {
 			return $token;
 		}
 

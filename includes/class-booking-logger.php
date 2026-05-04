@@ -10,6 +10,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Booking_Logger {
 
 	/**
+	 * Generic action logging method
+	 */
+	public static function log_action( $booking_id, $action, $message, $client_email = null ) {
+		Booking_DB::log_action(
+			$action,
+			$message,
+			$booking_id,
+			$client_email
+		);
+	}
+
+	/**
 	 * Log a booking attempt
 	 */
 	public static function log_attempt( $email, $date, $time_slot ) {

@@ -25,6 +25,7 @@ class Booking_DB {
 			time_slot TIME NOT NULL,
 			client_name VARCHAR(100) NOT NULL,
 			client_surname VARCHAR(100) NOT NULL,
+			client_section INT NOT NULL,
 			client_email VARCHAR(100) NOT NULL,
 			client_phone VARCHAR(20) NOT NULL,
 			status VARCHAR(20) DEFAULT 'pending',
@@ -75,9 +76,10 @@ class Booking_DB {
 				'time_slot'       => sanitize_text_field( $data['time_slot'] ),
 				'client_name'     => sanitize_text_field( $data['client_name'] ),
 				'client_surname'  => sanitize_text_field( $data['client_surname'] ),
+				'client_section'  => sanitize_text_field( $data['client_section'] ),
 				'client_email'    => sanitize_email( $data['client_email'] ),
 				'client_phone'    => sanitize_text_field( $data['client_phone'] ),
-				'status'          => 'pending',
+				'status'          => 'confirmed',
 			),
 			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
