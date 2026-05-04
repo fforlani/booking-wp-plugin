@@ -27,16 +27,31 @@ class Booking_Shortcode {
 		}
 
 		wp_enqueue_style(
+			'booking-flatpickr-style',
+			'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css',
+			array(),
+			'4.6.13'
+		);
+
+		wp_enqueue_style(
 			'booking-form-style',
 			BOOKING_PLUGIN_URL . 'public/form-style.css',
-			array(),
+			array( 'booking-flatpickr-style' ),
 			BOOKING_PLUGIN_VERSION
+		);
+
+		wp_enqueue_script(
+			'booking-flatpickr',
+			'https://cdn.jsdelivr.net/npm/flatpickr',
+			array(),
+			'4.6.13',
+			true
 		);
 
 		wp_enqueue_script(
 			'booking-form-script',
 			BOOKING_PLUGIN_URL . 'public/form-script.js',
-			array( 'jquery' ),
+			array( 'jquery', 'booking-flatpickr' ),
 			BOOKING_PLUGIN_VERSION,
 			true
 		);
@@ -64,15 +79,16 @@ class Booking_Shortcode {
 			<form id="booking-form" class="booking-form">
 				<div class="form-group">
 					<label for="booking-date">Data:</label>
-					<input type="date" id="booking-date" name="booking_date" list="booking-date-options" required />
+					<input type="text" id="booking-date" name="booking_date" list="booking-date-options" placeholder="Seleziona una data disponibile" readonly required />
 					<datalist id="booking-date-options"></datalist>
 				</div>
 
 				<div class="form-group">
 					<label for="booking-slot">Orario:</label>
-					<select id="booking-slot" name="time_slot" required>
-						<option value="">Seleziona un orario</option>
-					</select>
+					<input type="hidden" id="booking-slot" name="time_slot" />
+					<div id="booking-slot-options" class="booking-slot-options" aria-live="polite">
+						<div class="booking-slot-empty">Seleziona una data per vedere gli orari disponibili</div>
+					</div>
 				</div>
 
 				<div class="form-group">
