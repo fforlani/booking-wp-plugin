@@ -60,9 +60,9 @@ class Booking_Shortcode {
 			'booking-form-script',
 			'BookingData',
 			array(
-				'rest_url'   => rest_url( 'booking/v1/' ),
-				'nonce'      => wp_create_nonce( 'booking_nonce' ),
-				'site_url'   => site_url(),
+				'rest_url' => rest_url( 'booking/v1/' ),
+				'nonce'    => wp_create_nonce( 'booking_nonce' ),
+				'site_url' => site_url(),
 			)
 		);
 	}
@@ -74,57 +74,101 @@ class Booking_Shortcode {
 		ob_start();
 		?>
 		<div class="booking-form-container">
-			<h2>Prenota un Appuntamento</h2>
+			<div class="booking-form-header">
+				<p class="booking-form-kicker">Prenotazione appuntamento</p>
+				<h2>Prenota il tuo incontro</h2>
+				<p>Scegli una data disponibile, seleziona l'orario e completa i dati richiesti.</p>
+			</div>
 
 			<form id="booking-form" class="booking-form">
-				<div class="form-group">
-					<label for="booking-date">Data:</label>
-					<input type="text" id="booking-date" name="booking_date" list="booking-date-options" placeholder="Seleziona una data disponibile" readonly required />
-					<datalist id="booking-date-options"></datalist>
-				</div>
+				<div class="booking-step booking-step-date is-active">
+					<div class="booking-step-heading">
+						<span class="booking-step-number">1</span>
+						<div>
+							<h3>Scegli la data</h3>
+							<p>Mostriamo solo i giorni con disponibilita.</p>
+						</div>
+					</div>
 
-				<div class="form-group">
-					<label for="booking-slot">Orario:</label>
-					<input type="hidden" id="booking-slot" name="time_slot" />
-					<div id="booking-slot-options" class="booking-slot-options" aria-live="polite">
-						<div class="booking-slot-empty">Seleziona una data per vedere gli orari disponibili</div>
+					<div class="form-group">
+						<label for="booking-date">Data</label>
+						<input type="text" id="booking-date" name="booking_date" list="booking-date-options" placeholder="Seleziona una data disponibile" readonly required />
+						<datalist id="booking-date-options"></datalist>
 					</div>
 				</div>
 
-				<div class="form-group">
-					<label for="client-name">Nome dell'alunno *:</label>
-					<input type="text" id="client-name" name="client_name" required />
+				<div id="booking-slot-step" class="booking-step booking-step-slots" hidden>
+					<div class="booking-step-heading">
+						<span class="booking-step-number">2</span>
+						<div>
+							<h3>Scegli l'orario</h3>
+							<p>Gli slot cambiano in base alla data selezionata.</p>
+						</div>
+					</div>
+
+					<div class="booking-selection-summary">
+						Data selezionata: <strong id="booking-selected-date">-</strong>
+					</div>
+
+					<div class="form-group">
+						<label for="booking-slot">Orario</label>
+						<input type="hidden" id="booking-slot" name="time_slot" />
+						<div id="booking-slot-options" class="booking-slot-options" aria-live="polite">
+							<div class="booking-slot-empty">Seleziona una data per vedere gli orari disponibili</div>
+						</div>
+					</div>
 				</div>
 
-				<div class="form-group">
-					<label for="client-surname">Cognome dell'alunno *:</label>
-					<input type="text" id="client-surname" name="client_surname" required />
-				</div>
+				<div id="booking-details-step" class="booking-step booking-step-details" hidden>
+					<div class="booking-step-heading">
+						<span class="booking-step-number">3</span>
+						<div>
+							<h3>Completa i dati</h3>
+							<p>Ti invieremo la conferma ai recapiti indicati.</p>
+						</div>
+					</div>
 
-				<div class="form-group">
-					<label for="client-section">Futura sezione *:</label>
-					<select id="client-section" name="client_section" required >
-						<option disabled selected value="">Seleziona</option>
-						<option value="1">1ª</option>
-						<option value="2">2ª</option>
-						<option value="3">3ª</option>
-						<option value="4">4ª</option>
-						<option value="5">5ª</option>
-					</select>
-				</div>
+					<div class="booking-selection-summary">
+						Appuntamento: <strong id="booking-selected-summary">-</strong>
+					</div>
 
-				<div class="form-group">
-					<label for="client-email">Email *:</label>
-					<input type="email" id="client-email" name="client_email" required />
-				</div>
+					<div class="booking-fields-grid">
+						<div class="form-group">
+							<label for="client-name">Nome dell'alunno *</label>
+							<input type="text" id="client-name" name="client_name" autocomplete="given-name" required />
+						</div>
 
-				<div class="form-group">
-					<label for="client-phone">Cellulare del genitore *:</label>
-					<input type="tel" id="client-phone" name="client_phone" required />
-				</div>
+						<div class="form-group">
+							<label for="client-surname">Cognome dell'alunno *</label>
+							<input type="text" id="client-surname" name="client_surname" autocomplete="family-name" required />
+						</div>
 
-				<div class="form-group">
-					<button type="submit" class="submit-button">Prenota Appuntamento</button>
+						<div class="form-group">
+							<label for="client-section">Futura sezione *</label>
+							<select id="client-section" name="client_section" required>
+								<option disabled selected value="">Seleziona</option>
+								<option value="1">1&ordf;</option>
+								<option value="2">2&ordf;</option>
+								<option value="3">3&ordf;</option>
+								<option value="4">4&ordf;</option>
+								<option value="5">5&ordf;</option>
+							</select>
+						</div>
+
+						<div class="form-group">
+							<label for="client-email">Email *</label>
+							<input type="email" id="client-email" name="client_email" autocomplete="email" required />
+						</div>
+
+						<div class="form-group booking-field-wide">
+							<label for="client-phone">Cellulare del genitore *</label>
+							<input type="tel" id="client-phone" name="client_phone" autocomplete="tel" required />
+						</div>
+					</div>
+
+					<div class="form-group">
+						<button type="submit" class="submit-button">Conferma prenotazione</button>
+					</div>
 				</div>
 
 				<div id="form-message" class="form-message" style="display: none;"></div>

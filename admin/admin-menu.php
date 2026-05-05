@@ -567,7 +567,7 @@ class Booking_Admin {
 					formData.append('booking_credentials_file', file);
 					formData.append('booking_upload_credentials_nonce', $('[name="booking_upload_credentials_nonce"]').val());
 					
-					statusEl.html('<span style="color: #0073aa;">Caricamento in corso...</span>').show();
+					statusEl.html('<span style="color: #b91447;">Caricamento in corso...</span>').show();
 					
 					$.ajax({
 						type: 'POST',

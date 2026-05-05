@@ -3,6 +3,10 @@ jQuery(document).ready(function($) {
 	const dateInput = $('#booking-date');
 	const slotInput = $('#booking-slot');
 	const slotOptions = $('#booking-slot-options');
+	const slotStep = $('#booking-slot-step');
+	const detailsStep = $('#booking-details-step');
+	const selectedDateLabel = $('#booking-selected-date');
+	const selectedSummary = $('#booking-selected-summary');
 	const message = $('#form-message');
 	const dateOptions = $('#booking-date-options');
 	let availableDates = [];
@@ -105,6 +109,8 @@ jQuery(document).ready(function($) {
 					showMessage('Non ci sono date disponibili al momento.', 'error');
 					dateInput.val('');
 					resetSlots('Seleziona una data per vedere gli orari disponibili');
+					hideStep(slotStep);
+					hideStep(detailsStep);
 				}
 			},
 			error: function() {
@@ -117,6 +123,9 @@ jQuery(document).ready(function($) {
 	function handleDateChange(date) {
 		if (!date) {
 			resetSlots('Seleziona una data per vedere gli orari disponibili');
+			selectedDateLabel.text('-');
+			hideStep(slotStep);
+			hideStep(detailsStep);
 			return;
 		}
 
@@ -124,9 +133,16 @@ jQuery(document).ready(function($) {
 			showMessage('Data non disponibile. Seleziona una data con slot liberi.', 'error');
 			dateInput.val('');
 			resetSlots('Seleziona una data disponibile');
+			selectedDateLabel.text('-');
+			hideStep(slotStep);
+			hideStep(detailsStep);
 			return;
 		}
 
+		selectedDateLabel.text(formatDisplayDate(date));
+		selectedSummary.text('-');
+		showStep(slotStep);
+		hideStep(detailsStep);
 		loadSlots(date);
 	}
 
@@ -180,6 +196,7 @@ jQuery(document).ready(function($) {
 	function resetSlots(text) {
 		slotInput.val('');
 		slotOptions.html('<div class="booking-slot-empty">' + escapeHtml(text) + '</div>');
+		selectedSummary.text('-');
 	}
 
 	function escapeHtml(value) {
@@ -213,7 +230,32 @@ jQuery(document).ready(function($) {
 			.attr('aria-pressed', 'true');
 
 		slotInput.val(button.data('slot'));
+		selectedSummary.text(formatDisplayDate(dateInput.val()) + ' alle ' + button.data('slot'));
+		showStep(detailsStep);
 	});
+
+	function showStep(step) {
+		step.prop('hidden', false).addClass('is-active');
+	}
+
+	function hideStep(step) {
+		step.prop('hidden', true).removeClass('is-active');
+	}
+
+	function formatDisplayDate(dateString) {
+		if (!dateString) {
+			return '-';
+		}
+
+		const date = new Date(dateString + 'T00:00:00');
+
+		return date.toLocaleDateString('it-IT', {
+			weekday: 'long',
+			day: '2-digit',
+			month: 'long',
+			year: 'numeric'
+		});
+	}
 
 	// Handle form submission
 	form.on('submit', function(e) {
@@ -249,6 +291,9 @@ jQuery(document).ready(function($) {
 						calendar.clear();
 					}
 					resetSlots('Seleziona una data per vedere gli orari disponibili');
+					selectedDateLabel.text('-');
+					hideStep(slotStep);
+					hideStep(detailsStep);
 					loadAvailableDates();
 				} else {
 					showMessage('Errore durante la prenotazione', 'error');
