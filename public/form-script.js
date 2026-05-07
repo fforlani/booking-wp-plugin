@@ -271,6 +271,7 @@ jQuery(document).ready(function($) {
 			time_slot: slotInput.val(),
 			client_name: $('#client-name').val(),
 			client_surname: $('#client-surname').val(),
+			client_gender: $('#client-gender').val(),
 			client_section: $('#client-section').val(),
 			client_email: $('#client-email').val(),
 			client_phone: $('#client-phone').val()

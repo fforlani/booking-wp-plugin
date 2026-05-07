@@ -10,20 +10,59 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Booking_Email {
 	static $smtp_initialized = false;
 
-	private static function init_smtp() {
+	public static function init_smtp() {
+		$smtp_enabled = Booking_Settings::get( 'smtp_enabled', false );
+
+		// Only configure if custom SMTP is enabled
+		if ( ! $smtp_enabled ) {
+			remove_action('phpmailer_init', function($phpmailer) {});
+			return;
+		}
+
 		add_action('phpmailer_init', function($phpmailer) {
+
+			$host = Booking_Settings::get( 'smtp_host' );
+			$port = Booking_Settings::get( 'smtp_port' );
+			$username = Booking_Settings::get( 'smtp_username' );
+			$password = Booking_Settings::get( 'smtp_password' );
+			$secure = Booking_Settings::get( 'smtp_secure' );
+
+			// Validate required settings
+			if ( ! $host || ! $port || ! $username || ! $password ) {
+				return;
+			}
+
 			$phpmailer->isSMTP();
-			$phpmailer->Host = 'smtp.gmail.com';
+			$phpmailer->Host = $host;
 			$phpmailer->SMTPAuth = true;
-			$phpmailer->Port = 587;
-			$phpmailer->Username = 'fediforla@gmail.com';
-			$phpmailer->Password = 'qvjx grdp ebwi ivuk';
-			$phpmailer->SMTPSecure = 'tls';
+			$phpmailer->Port = intval( $port );
+			$phpmailer->Username = $username;
+			$phpmailer->Password = $password;
+			
+			// Set secure connection type
+			if ( 'ssl' === $secure ) {
+				$phpmailer->SMTPSecure = 'ssl';
+			} elseif ( 'tls' === $secure ) {
+				$phpmailer->SMTPSecure = 'tls';
+			} else {
+				$phpmailer->SMTPSecure = '';
+			}
 		});
 
-		add_filter('wp_mail_from', function() {
-			return 'fediforla@gmail.com';
-		});
+		// Set sender name and email if configured
+		$from_email = Booking_Settings::get( 'smtp_from_email' );
+		if ( $from_email ) {
+			add_filter('wp_mail_from', function() use ($from_email) {
+				return $from_email;
+			});
+		}
+
+		$from_name = Booking_Settings::get( 'smtp_from_name' );
+		if ( $from_name ) {
+			add_filter('wp_mail_from_name', function() use ($from_name) {
+				return $from_name;
+			});
+		}
 	}
 
 	/**
@@ -45,7 +84,10 @@ class Booking_Email {
 		$to = $booking->client_email;
 		$subject = 'Conferma Prenotazione';
 		$message = self::get_message( $booking );
-		$headers = self::get_headers();
+		$headers = array(
+			"Content-Type: text/plain; charset=UTF-8",
+			"Bcc: " . get_option( 'admin_email' )
+		);
 
 		$sent = wp_mail( $to, $subject, $message, $headers );
 
@@ -69,6 +111,12 @@ class Booking_Email {
 		$message .= "Orario: {$booking->time_slot}\n";
 		$message .= "Nome: {$booking->client_name} {$booking->client_surname}\n";
 		$message .= "Sezione: {$booking->client_section}\n";
+		
+		if ( ! empty( $booking->client_gender ) ) {
+			$gender_display = 'M' === $booking->client_gender ? 'Maschio' : 'Femmina';
+			$message .= "Genere: {$gender_display}\n";
+		}
+		
 		$message .= "Email: {$booking->client_email}\n";
 		$message .= "Telefono: {$booking->client_phone}\n\n";
 		$message .= "Grazie per la tua prenotazione!\n\n";
@@ -76,15 +124,6 @@ class Booking_Email {
 		$message .= get_bloginfo( 'name' );
 
 		return $message;
-	}
-
-	/**
-	 * Get email headers
-	 */
-	private static function get_headers() {
-		$headers = "Content-Type: text/plain; charset=UTF-8\r\n";
-		$headers .= "From: " . get_option( 'admin_email' ) . "\r\n";
-		return $headers;
 	}
 
 	/**
@@ -111,6 +150,12 @@ class Booking_Email {
 		$message = "Una nuova prenotazione è stata ricevuta:\n\n";
 		$message .= "Nome: {$booking->client_name} {$booking->client_surname}\n";
 		$message .= "Sezione: {$booking->client_section}\n";
+		
+		if ( ! empty( $booking->client_gender ) ) {
+			$gender_display = 'M' === $booking->client_gender ? 'Maschio' : 'Femmina';
+			$message .= "Genere: {$gender_display}\n";
+		}
+		
 		$message .= "Email: {$booking->client_email}\n";
 		$message .= "Telefono: {$booking->client_phone}\n";
 		$message .= "Data: " . date_i18n( 'd/m/Y', strtotime( $booking->booking_date ) ) . "\n";

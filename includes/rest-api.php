@@ -135,6 +135,7 @@ class Booking_REST_API {
 			'booking_date'   => isset( $data['booking_date'] ) ? sanitize_text_field( $data['booking_date'] ) : '',
 			'time_slot'      => isset( $data['time_slot'] ) ? sanitize_text_field( $data['time_slot'] ) : '',
 			'client_name'    => isset( $data['client_name'] ) ? Booking_Security::sanitize_name( $data['client_name'] ) : '',
+			'client_gender'    => isset( $data['client_gender'] ) ? $data['client_gender'] : '',
 			'client_surname' => isset( $data['client_surname'] ) ? Booking_Security::sanitize_name( $data['client_surname'] ) : '',
 			'client_section' => isset( $data['client_section'] ) ? (int)( $data['client_section'] ) : '',
 			'client_email'   => isset( $data['client_email'] ) ? Booking_Security::sanitize_email( $data['client_email'] ) : '',

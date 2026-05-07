@@ -30,6 +30,16 @@ function booking_get_defaults() {
 		'admin_email_on_booking'     => true,
 		'send_confirmation_email'    => true,
 
+		// SMTP settings
+		'smtp_enabled'               => false,
+		'smtp_host'                  => '',
+		'smtp_port'                  => 587,
+		'smtp_username'              => '',
+		'smtp_password'              => '',
+		'smtp_secure'                => 'tls',
+		'smtp_from_email'            => '',
+		'smtp_from_name'             => 'Booking System',
+
 		// Google Calendar settings
 		'google_calendar_enabled'    => false,
 		'google_calendar_id'         => '', // Google Calendar email or ID

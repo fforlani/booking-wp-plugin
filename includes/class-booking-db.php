@@ -28,6 +28,7 @@ class Booking_DB {
 			client_section INT NOT NULL,
 			client_email VARCHAR(100) NOT NULL,
 			client_phone VARCHAR(20) NOT NULL,
+			client_gender VARCHAR(1) NULL,
 			status VARCHAR(20) DEFAULT 'pending',
 			google_event_id VARCHAR(255),
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -79,9 +80,10 @@ class Booking_DB {
 				'client_section'  => sanitize_text_field( $data['client_section'] ),
 				'client_email'    => sanitize_email( $data['client_email'] ),
 				'client_phone'    => sanitize_text_field( $data['client_phone'] ),
+				'client_gender'   => ! empty( $data['client_gender'] ) ? sanitize_text_field( $data['client_gender'] ) : null,
 				'status'          => 'confirmed',
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false === $result ) {

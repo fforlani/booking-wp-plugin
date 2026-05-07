@@ -156,11 +156,20 @@ class Booking_Shortcode {
 						</div>
 
 						<div class="form-group">
+							<label for="client-gender">Genere</label>
+							<select id="client-gender" name="client_gender">
+								<option value="">Non specificato</option>
+								<option value="M">Maschio</option>
+								<option value="F">Femmina</option>
+							</select>
+						</div>
+
+						<div class="form-group">
 							<label for="client-email">Email *</label>
 							<input type="email" id="client-email" name="client_email" autocomplete="email" required />
 						</div>
 
-						<div class="form-group booking-field-wide">
+						<div class="form-group">
 							<label for="client-phone">Cellulare del genitore *</label>
 							<input type="tel" id="client-phone" name="client_phone" autocomplete="tel" required />
 						</div>

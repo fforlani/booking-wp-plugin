@@ -89,9 +89,16 @@ class Booking_Google_Calendar {
 		$end_time = date( 'H:i', strtotime( $time . " + {$slot_duration} minutes" ) );
 		$end_datetime = (new DateTime("{$date} {$end_time}", $timezone))->format("Y-m-d\\TH:i:sP");
 
+		$description = "Prenotazione di {$booking->client_name} {$booking->client_surname}\nEmail: {$booking->client_email}\nTelefono: {$booking->client_phone}\nSezione: {$booking->client_section}";
+		
+		if ( ! empty( $booking->client_gender ) ) {
+			$gender_display = 'M' === $booking->client_gender ? 'Maschio' : 'Femmina';
+			$description .= "\nGenere: {$gender_display}";
+		}
+
 		$event = array(
 			'summary'     => "Prenotazione - {$booking->client_name} {$booking->client_surname}",
-			'description' => "Prenotazione di {$booking->client_name} {$booking->client_surname}\nEmail: {$booking->client_email}\nTelefono: {$booking->client_phone}\nSezione: {$booking->client_section}",
+			'description' => $description,
 			'start'       => array(
 				'dateTime' => $start_datetime,
 				'timeZone' => $timezone,

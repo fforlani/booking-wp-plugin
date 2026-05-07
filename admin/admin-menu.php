@@ -113,14 +113,38 @@ class Booking_Admin {
 		register_setting( 'booking_system_group', 'booking_system_google_calendar_id' );
 		register_setting('booking_system_group', 'booking_system_rate_limit_enabled');
 		register_setting('booking_system_group', 'booking_system_rate_limit_attempts');
+		
+		// Email/SMTP settings
+		register_setting( 'booking_system_group', 'booking_system_smtp_enabled' );
+		register_setting( 'booking_system_group', 'booking_system_smtp_host' );
+		register_setting( 'booking_system_group', 'booking_system_smtp_port' );
+		register_setting( 'booking_system_group', 'booking_system_smtp_username' );
+		register_setting( 'booking_system_group', 'booking_system_smtp_password', array(
+			'sanitize_callback' => array( __CLASS__, 'sanitize_smtp_password' )
+		) );
+		register_setting( 'booking_system_group', 'booking_system_smtp_secure' );
+		register_setting( 'booking_system_group', 'booking_system_smtp_from_email' );
+		register_setting( 'booking_system_group', 'booking_system_smtp_from_name' );
 /* 		register_setting( 'booking_system_group', 'booking_system_enable_recaptcha' );
 		register_setting( 'booking_system_group', 'booking_system_recaptcha_site_key' );
 		register_setting( 'booking_system_group', 'booking_system_recaptcha_secret_key' ); */
+
+		Booking_Email::init_smtp();
 
 		// Handle Google credentials upload
 		if ( isset( $_POST['booking_upload_credentials_nonce'] )) {
 			self::handle_google_credentials_upload();
 		}
+	}
+
+	/**
+	 * Sanitize SMTP password
+	 */
+	public static function sanitize_smtp_password( $value ) {
+		if ( empty( $value ) ) {
+			return '';
+		}
+		return sanitize_text_field( $value );
 	}
 
 	/**
@@ -234,6 +258,7 @@ class Booking_Admin {
 			<h2 class="nav-tab-wrapper">
 				<a href="#tab-general" class="nav-tab nav-tab-active">Generale</a>
 				<a href="#tab-blocked-dates" class="nav-tab">Date Bloccate</a>
+				<a href="#tab-email" class="nav-tab">Email</a>
 				<a href="#tab-google" class="nav-tab">Google Calendar</a>
 				<a href="#tab-security" class="nav-tab">Sicurezza</a>
 			</h2>
@@ -261,6 +286,22 @@ class Booking_Admin {
 							<td>
 								<input type="date" id="availability_end_date" name="booking_system_availability_end_date" value="<?php echo esc_attr( $settings['availability_end_date'] ); ?>" />
 								<p class="description">Data fino a cui è possibile prenotare (es: 18 settembre 2026)</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="booking_timezone">Timezone:</label>
+							</th>
+							<td>
+								<select id="booking_timezone" name="booking_system_booking_timezone">
+									<?php
+									$timezones = timezone_identifiers_list();
+									foreach ( $timezones as $tz ) {
+										$selected = ( $tz === $settings['booking_timezone'] ) ? 'selected' : '';
+										echo '<option value="' . esc_attr( $tz ) . '" ' . $selected . '>' . esc_html( $tz ) . '</option>';
+									}
+									?>
+								</select>
 							</td>
 						</tr>
 					</table>
@@ -309,43 +350,6 @@ class Booking_Admin {
 						</tr>
 					</table>
 
-					<h3>Impostazioni Generali</h3>
-					<table class="form-table">
-						<tr>
-							<th scope="row">
-								<label for="booking_timezone">Timezone:</label>
-							</th>
-							<td>
-								<select id="booking_timezone" name="booking_system_booking_timezone">
-									<?php
-									$timezones = timezone_identifiers_list();
-									foreach ( $timezones as $tz ) {
-										$selected = ( $tz === $settings['booking_timezone'] ) ? 'selected' : '';
-										echo '<option value="' . esc_attr( $tz ) . '" ' . $selected . '>' . esc_html( $tz ) . '</option>';
-									}
-									?>
-								</select>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row">
-								<label for="send_confirmation_email">Invia Email di Conferma:</label>
-							</th>
-							<td>
-								<input type="checkbox" id="send_confirmation_email" name="booking_system_send_confirmation_email" value="1" <?php checked( $settings['send_confirmation_email'] ); ?> />
-								<p class="description">Invia email di conferma ai clienti dopo la prenotazione</p>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row">
-								<label for="admin_email_on_booking">Notifica Email Admin:</label>
-							</th>
-							<td>
-								<input type="checkbox" id="admin_email_on_booking" name="booking_system_admin_email_on_booking" value="1" <?php checked( $settings['admin_email_on_booking'] ); ?> />
-								<p class="description">Ricevi notifiche quando viene fatta una prenotazione</p>
-							</td>
-						</tr>
-					</table>
 				</div>
 
 				<!-- Blocked Dates Tab -->
@@ -376,6 +380,118 @@ class Booking_Admin {
 							<td>
 								<textarea id="blocked_specific_dates" name="booking_system_blocked_specific_dates" rows="8" style="width: 100%; font-family: monospace;"><?php echo esc_textarea( implode( "\n", $settings['blocked_specific_dates'] ) ); ?></textarea>
 								<p class="description">Inserisci le date nel formato YYYY-MM-DD (es: 2026-06-15)</p>
+							</td>
+						</tr>
+					</table>
+				</div>
+
+				<!-- Email Configuration Tab -->
+				<div id="tab-email" class="tab-content">
+					<h3>Configurazione Email</h3>
+					<table class="form-table">
+						<tr>
+							<th scope="row">
+								<label for="smtp_enabled">Usa SMTP Personalizzato:</label>
+							</th>
+							<td>
+								<input type="checkbox" id="smtp_enabled" name="booking_system_smtp_enabled" value="1" <?php checked( $settings['smtp_enabled'] ); ?> />
+								<p class="description">Abilita per usare un server SMTP personalizzato invece di quello di WordPress</p>
+							</td>
+						</tr>
+					</table>
+
+					<h3 id="smtp_fields_title" style="<?php echo $settings['smtp_enabled'] ? '' : 'display: none;'; ?>">Parametri SMTP</h3>
+					<div id="smtp_fields" class="smtp-config" style="<?php echo $settings['smtp_enabled'] ? '' : 'display: none;'; ?>">
+						<table class="form-table">
+							<tr>
+								<th scope="row">
+									<label for="smtp_host">Host SMTP *</label>
+								</th>
+								<td>
+									<input type="text" id="smtp_host" name="booking_system_smtp_host" value="<?php echo esc_attr( $settings['smtp_host'] ); ?>" placeholder="smtp.gmail.com" />
+									<p class="description">Es: smtp.gmail.com, smtp.office365.com</p>
+								</td>
+							</tr>
+							<tr>
+								<th scope="row">
+									<label for="smtp_port">Porta *</label>
+								</th>
+								<td>
+									<input type="number" id="smtp_port" name="booking_system_smtp_port" value="<?php echo esc_attr( $settings['smtp_port'] ); ?>" placeholder="587" min="1" max="65535" />
+									<p class="description">Normalmente: 587 (TLS), 465 (SSL), 25 (non sicuro)</p>
+								</td>
+							</tr>
+							<tr>
+								<th scope="row">
+									<label for="smtp_secure">Tipo di Sicurezza *</label>
+								</th>
+								<td>
+									<select id="smtp_secure" name="booking_system_smtp_secure">
+										<option value="">Seleziona</option>
+										<option value="tls" <?php selected( $settings['smtp_secure'], 'tls' ); ?>>TLS</option>
+										<option value="ssl" <?php selected( $settings['smtp_secure'], 'ssl' ); ?>>SSL</option>
+										<option value="none" <?php selected( $settings['smtp_secure'], 'none' ); ?>>Nessuno</option>
+									</select>
+									<p class="description">TLS è consigliato (porta 587), SSL per porta 465</p>
+								</td>
+							</tr>
+							<tr>
+								<th scope="row">
+									<label for="smtp_username">Username *</label>
+								</th>
+								<td>
+									<input type="text" id="smtp_username" name="booking_system_smtp_username" value="<?php echo esc_attr( $settings['smtp_username'] ); ?>" placeholder="tua.email@gmail.com" />
+									<p class="description">Solitamente è l'indirizzo email del tuo account</p>
+								</td>
+							</tr>
+							<tr>
+								<th scope="row">
+									<label for="smtp_password">Password *</label>
+								</th>
+								<td>
+									<input type="password" id="smtp_password" name="booking_system_smtp_password" value="<?php echo esc_attr( $settings['smtp_password'] ); ?>" placeholder="Password app o account" />
+									<p class="description" style="color: #d63638;">⚠️ Per Gmail, usa una password app (non la password principale)</p>
+								</td>
+							</tr>
+							<tr>
+								<th scope="row">
+									<label for="smtp_from_email">Email Mittente *</label>
+								</th>
+								<td>
+									<input type="email" id="smtp_from_email" name="booking_system_smtp_from_email" value="<?php echo esc_attr( $settings['smtp_from_email'] ); ?>" placeholder="noreply@tuodominio.com" />
+									<p class="description">Indirizzo email che apparirà come mittente dei messaggi</p>
+								</td>
+							</tr>
+							<tr>
+								<th scope="row">
+									<label for="smtp_from_name">Nome Mittente</label>
+								</th>
+								<td>
+									<input type="text" id="smtp_from_name" name="booking_system_smtp_from_name" value="<?php echo esc_attr( $settings['smtp_from_name'] ); ?>" placeholder="Booking System" />
+									<p class="description">Nome che apparirà nei messaggi inviati</p>
+								</td>
+							</tr>
+						</table>
+					</div>
+
+					<h3>Email Inviate</h3>
+					<table class="form-table">
+						<tr>
+							<th scope="row">
+								<label for="send_confirmation_email">Invia Email di Conferma:</label>
+							</th>
+							<td>
+								<input type="checkbox" id="send_confirmation_email" name="booking_system_send_confirmation_email" value="1" <?php checked( $settings['send_confirmation_email'] ); ?> />
+								<p class="description">Invia email di conferma ai clienti dopo la prenotazione</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="admin_email_on_booking">Notifica Email Admin:</label>
+							</th>
+							<td>
+								<input type="checkbox" id="admin_email_on_booking" name="booking_system_admin_email_on_booking" value="1" <?php checked( $settings['admin_email_on_booking'] ); ?> />
+								<p class="description">Ricevi notifiche quando viene fatta una prenotazione</p>
 							</td>
 						</tr>
 					</table>
@@ -530,6 +646,7 @@ class Booking_Admin {
 
 		<script>
 			jQuery(document).ready(function($) {
+				// Tab switching
 				$('.nav-tab').on('click', function(e) {
 					e.preventDefault();
 					const tab = $(this).attr('href');
@@ -537,6 +654,17 @@ class Booking_Admin {
 					$('.tab-content').removeClass('active');
 					$(this).addClass('nav-tab-active');
 					$(tab).addClass('active');
+				});
+
+				// Toggle SMTP fields visibility
+				$('#smtp_enabled').on('change', function() {
+					if ($(this).is(':checked')) {
+						$('#smtp_fields').slideDown();
+						$('#smtp_fields_title').show();
+					} else {
+						$('#smtp_fields').slideUp();
+						$('#smtp_fields_title').hide();
+					}
 				});
 
 				// Handle Google Credentials Upload via AJAX
@@ -641,11 +769,12 @@ class Booking_Admin {
 					<tr>
 						<th>ID</th>
 						<th>Nome</th>
+						<th>Genere</th>
 						<th>Sezione</th>
 						<th>Email</th>
+						<th>Telefono</th>
 						<th>Data</th>
 						<th>Orario</th>
-						<th>Telefono</th>
 						<th>Status</th>
 						<th>Data Creazione</th>
 					</tr>
@@ -655,11 +784,12 @@ class Booking_Admin {
 						<tr>
 							<td><?php echo esc_html( $booking->id ); ?></td>
 							<td><?php echo esc_html( $booking->client_name . ' ' . $booking->client_surname ); ?></td>
+							<td><?php echo esc_html( $booking->client_gender ); ?></td>
 							<td><?php echo esc_html( $booking->client_section ); ?></td>
 							<td><?php echo esc_html( $booking->client_email ); ?></td>
+							<td><?php echo esc_html( $booking->client_phone ); ?></td>
 							<td><?php echo esc_html( date_i18n( 'd/m/Y', strtotime( $booking->booking_date ) ) ); ?></td>
 							<td><?php echo esc_html( $booking->time_slot ); ?></td>
-							<td><?php echo esc_html( $booking->client_phone ); ?></td>
 							<td>
 								<span class="status-<?php echo esc_attr( $booking->status ); ?>">
 									<?php echo esc_html( ucfirst( $booking->status ) ); ?>
