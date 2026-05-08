@@ -30,6 +30,7 @@ function booking_get_defaults() {
 		'admin_email_on_booking'     => true,
 		'send_confirmation_email'    => true,
 		'confirmation_email_template' => '',
+		'cancellation_email_template' => '',
 
 		// SMTP settings
 		'smtp_enabled'               => false,

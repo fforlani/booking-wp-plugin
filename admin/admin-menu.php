@@ -110,6 +110,7 @@ class Booking_Admin {
 		register_setting( 'booking_system_group', 'booking_system_admin_email_on_booking' );
 		register_setting( 'booking_system_group', 'booking_system_send_confirmation_email' );
 		register_setting( 'booking_system_group', 'booking_system_confirmation_email_template');
+		register_setting( 'booking_system_group', 'booking_system_cancellation_email_template');
 		register_setting( 'booking_system_group', 'booking_system_google_calendar_enabled' );
 		register_setting( 'booking_system_group', 'booking_system_google_calendar_id' );
 		register_setting('booking_system_group', 'booking_system_rate_limit_enabled');
@@ -129,8 +130,6 @@ class Booking_Admin {
 /* 		register_setting( 'booking_system_group', 'booking_system_enable_recaptcha' );
 		register_setting( 'booking_system_group', 'booking_system_recaptcha_site_key' );
 		register_setting( 'booking_system_group', 'booking_system_recaptcha_secret_key' ); */
-
-		Booking_Email::init_smtp();
 
 		// Handle Google credentials upload
 		if ( isset( $_POST['booking_upload_credentials_nonce'] )) {
@@ -484,7 +483,7 @@ class Booking_Admin {
 							</th>
 							<td>
 								<input type="checkbox" id="send_confirmation_email" name="booking_system_send_confirmation_email" value="1" <?php checked( $settings['send_confirmation_email'] ); ?> />
-								<p class="description">Invia email di conferma ai clienti dopo la prenotazione, e in ccn all'admin</p>
+								<p class="description">Invia email di conferma ai clienti e in ccn all'admin</p>
 							</td>
 						</tr>
 						<tr>
@@ -503,6 +502,15 @@ class Booking_Admin {
 							<td>
 								<textarea id="confirmation_email_template" name="booking_system_confirmation_email_template" rows="16" style="width: 100%; font-family: monospace;"><?php echo esc_textarea( $settings['confirmation_email_template'] ); ?></textarea>
 								<p class="description">Testo inviato al cliente. Puoi usare i token sotto per inserire automaticamente i dati della prenotazione.</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="cancellation_email_template">Messaggio Email Cancellazione:</label>
+							</th>
+							<td>
+								<textarea id="cancellation_email_template" name="booking_system_cancellation_email_template" rows="10" style="width: 100%; font-family: monospace;"><?php echo esc_textarea( $settings['cancellation_email_template'] ); ?></textarea>
+								<p class="description">Testo inviato al cliente quando cancella la prenotazione dal link di gestione. Puoi usare gli stessi token disponibili sotto.</p>
 							</td>
 						</tr>
 					</table>

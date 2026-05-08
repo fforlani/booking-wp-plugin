@@ -52,12 +52,32 @@ class Booking_REST_API {
 				'permission_callback' => '__return_true',
 			)
 		);
+
+		register_rest_route(
+			'booking/v1',
+			'/cancel',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( __CLASS__, 'cancel_reservation_request' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
+		register_rest_route(
+			'booking/v1',
+			'/reschedule',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( __CLASS__, 'reschedule_reservation_request' ),
+				'permission_callback' => '__return_true',
+			)
+		);
 	}
 
 	/**
 	 * Get available dates with at least one available slot
 	 */
-	public static function get_available_dates( $request ) {
+	public static function get_available_dates() {
 		$rate_limit_check = Booking_Security::check_rate_limit();
 		if ( is_wp_error( $rate_limit_check ) ) {
 			Booking_Logger::log_action( null, 'rate_limit_exceeded', 'Rate limit hit on GET /dates', Booking_Security::get_client_ip() );
@@ -95,6 +115,47 @@ class Booking_REST_API {
 			'date'  => $date,
 			'slots' => $slots,
 		);
+	}
+
+	/**
+	 * Cancel an existing reservation from a signed public token.
+	 */
+	public static function cancel_reservation_request( $request ) {
+		$data = $request->get_json_params();
+		if ( ! is_array( $data ) ) {
+			return new WP_Error( 'invalid_data', 'Dati non validi.', array( 'status' => 400 ) );
+		}
+
+		$token = isset( $data['token'] ) ? sanitize_text_field( $data['token'] ) : '';
+		$booking = self::get_booking_from_token( $token );
+
+		if ( is_wp_error( $booking ) ) {
+			return $booking;
+		}
+
+		return self::cancel_reservation( $booking );
+	}
+
+	/**
+	 * Reschedule an existing reservation from a signed public token.
+	 */
+	public static function reschedule_reservation_request( $request ) {
+		$data = $request->get_json_params();
+		if ( ! is_array( $data ) ) {
+			return new WP_Error( 'invalid_data', 'Dati non validi.', array( 'status' => 400 ) );
+		}
+
+		$token = isset( $data['token'] ) ? sanitize_text_field( $data['token'] ) : '';
+		$booking = self::get_booking_from_token( $token );
+
+		if ( is_wp_error( $booking ) ) {
+			return $booking;
+		}
+
+		$new_date = isset( $data['booking_date'] ) ? sanitize_text_field( $data['booking_date'] ) : '';
+		$new_time_slot = isset( $data['time_slot'] ) ? sanitize_text_field( $data['time_slot'] ) : '';
+
+		return self::reschedule_reservation( $booking, $new_date, $new_time_slot );
 	}
 
 	/**
@@ -189,20 +250,6 @@ class Booking_REST_API {
 			return new WP_Error( 'reservation_failed', Booking_Security::get_safe_error_message( 'database_error' ), array( 'status' => 400 ) );
 		}
 
-		// Send confirmation email
-		if(Booking_Settings::is_send_confirm_email()) {
-			$sent = Booking_Email::send_confirmation( $booking_id );
-			if(! $sent) {
-				Booking_DB::delete_booking( $booking_id );
-				return new WP_Error( 'email_sending_failed', "Errore nell'invio della mail", array( 'status' => 400 ) );
-			}
-		}
-
-		// Send admin notification
-		if(Booking_Settings::is_send_admin_notification_email()) {
-			Booking_Email::send_admin_notification( $booking_id );
-		}
-
 		// Add to Google Calendar
 		if (Booking_Settings::get( 'google_calendar_enabled' ) ) {
 			$added = Booking_Google_Calendar::add_event( $booking_id );
@@ -215,6 +262,17 @@ class Booking_REST_API {
 				return new WP_Error( 'email_sending_failed', "errore nell'invio della mail", array( 'status' => 400 ) );
 			}
 		}
+
+		// Send confirmation email
+		$sent = Booking_Email::send_confirmation( $booking_id );
+		if(! $sent) {
+			Booking_DB::delete_booking( $booking_id );
+			Booking_Google_Calendar::delete_event( $booking_id );
+			return new WP_Error( 'email_sending_failed', "Errore nell'invio della mail", array( 'status' => 400 ) );
+		}
+
+		// Send admin notification
+		Booking_Email::send_admin_notification( $booking_id );
 		
 
 		// Log success
@@ -228,6 +286,99 @@ class Booking_REST_API {
 			'booking_id' => $booking_id,
 			'booking'    => $booking,
 			'message'    => 'Ti abbiamo inviato un’email con la conferma e tutte le informazioni utili',
+		);
+	}
+
+	private static function get_booking_from_token( $token ) {
+		$token_data = Booking_Security::validate_booking_management_token( $token );
+
+		if ( is_wp_error( $token_data ) ) {
+			return new WP_Error( 'invalid_token', $token_data->get_error_message(), array( 'status' => 403 ) );
+		}
+
+		$booking = Booking_DB::get_booking( $token_data['booking_id'] );
+
+		if ( ! $booking ) {
+			return new WP_Error( 'booking_not_found', 'Prenotazione non trovata.', array( 'status' => 404 ) );
+		}
+
+		if ( strtolower( $booking->client_email ) !== strtolower( $token_data['email'] ) ) {
+			return new WP_Error( 'invalid_token', 'Link di gestione non valido.', array( 'status' => 403 ) );
+		}
+
+		return $booking;
+	}
+
+	private static function cancel_reservation( $booking ) {
+		if ( Booking_Settings::get( 'google_calendar_enabled' ) && ! empty( $booking->google_event_id ) ) {
+			$deleted = Booking_Google_Calendar::delete_event( $booking->id );
+			if ( ! $deleted ) {
+				return new WP_Error( 'calendar_error', 'Non siamo riusciti ad aggiornare il calendario. Riprova tra qualche minuto.', array( 'status' => 400 ) );
+			}
+		}
+
+		Booking_Logger::log_action( $booking->id, 'booking_cancelled_by_customer', 'Prenotazione cancellata dal link pubblico.', $booking->client_email );
+
+		if ( ! Booking_DB::delete_booking( $booking->id ) ) {
+			return new WP_Error( 'delete_failed', 'Non siamo riusciti a cancellare la prenotazione.', array( 'status' => 400 ) );
+		}
+
+		Booking_Email::send_cancellation( $booking );
+
+		return array(
+			'success' => true,
+			'message' => 'La prenotazione e stata cancellata correttamente.',
+		);
+	}
+
+	private static function reschedule_reservation( $booking, $new_date, $new_time_slot ) {
+		if ( ! Booking_Security::validate_booking_date( $new_date ) ) {
+			return new WP_Error( 'invalid_date', 'Data non valida.', array( 'status' => 400 ) );
+		}
+
+		if ( ! Booking_Security::validate_time_slot( $new_time_slot ) ) {
+			return new WP_Error( 'invalid_time_slot', 'Orario non valido.', array( 'status' => 400 ) );
+		}
+
+		if ( ! Booking_Availability::is_slot_available( $new_date, $new_time_slot, $booking->id ) ) {
+			return new WP_Error( 'slot_not_available', 'Lo slot selezionato non e piu disponibile.', array( 'status' => 400 ) );
+		}
+
+		$old_date = $booking->booking_date;
+		$old_time_slot = $booking->time_slot;
+
+		if ( ! Booking_DB::update_booking_schedule( $booking->id, $new_date, $new_time_slot ) ) {
+			return new WP_Error( 'update_failed', 'Non siamo riusciti a riprogrammare la prenotazione.', array( 'status' => 400 ) );
+		}
+
+		if ( Booking_Settings::get( 'google_calendar_enabled' ) && ! empty( $booking->google_event_id ) ) {
+			$updated = Booking_Google_Calendar::update_event( $booking->id );
+			if ( ! $updated ) {
+				Booking_DB::update_booking_schedule( $booking->id, $old_date, $old_time_slot );
+				return new WP_Error( 'calendar_error', 'Non siamo riusciti ad aggiornare il calendario. Riprova tra qualche minuto.', array( 'status' => 400 ) );
+			}
+		}
+
+		Booking_Logger::log_action(
+			$booking->id,
+			'booking_rescheduled_by_customer',
+			"Prenotazione riprogrammata da {$old_date} {$old_time_slot} a {$new_date} {$new_time_slot}.",
+			$booking->client_email
+		);
+
+		if ( ! Booking_Email::send_confirmation( $booking->id ) ) {
+			Booking_DB::update_booking_schedule( $booking->id, $old_date, $old_time_slot );
+			if ( Booking_Settings::get( 'google_calendar_enabled' ) && ! empty( $booking->google_event_id ) ) {
+				Booking_Google_Calendar::update_event( $booking->id );
+			}
+
+			return new WP_Error( 'email_sending_failed', "Errore nell'invio della mail di conferma", array( 'status' => 400 ) );
+		}
+
+		return array(
+			'success' => true,
+			'message' => 'La prenotazione e stata riprogrammata correttamente.',
+			'booking' => Booking_DB::get_booking( $booking->id ),
 		);
 	}
 }

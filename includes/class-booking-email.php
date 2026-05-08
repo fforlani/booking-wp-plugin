@@ -8,9 +8,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Booking_Email {
-	static $smtp_initialized = false;
 
-	public static function init_smtp() {
+	public static function set_smtp() {
 		$smtp_enabled = Booking_Settings::get( 'smtp_enabled', false );
 
 		// Only configure if custom SMTP is enabled
@@ -69,16 +68,15 @@ class Booking_Email {
 	 * Send confirmation email to client
 	 */
 	public static function send_confirmation( $booking_id ) {
+		if(!Booking_Settings::is_send_confirm_email()) {
+			return true;
+		}
+
 		$booking = Booking_DB::get_booking( $booking_id );
 
 		if ( ! $booking ) {
 			Booking_Logger::log_email_error( $booking_id, '', 'Prenotazione non trovata' );
 			return false;
-		}
-
-		if( !Booking_Email::$smtp_initialized ) {
-			Booking_Email::init_smtp();
-			Booking_Email::$smtp_initialized = true;
 		}
 
 		$to = $booking->client_email;
@@ -90,16 +88,60 @@ class Booking_Email {
 		$message = self::replace_tokens( $message, $booking );
 
 		$headers = array(
-			"Content-Type: text/plain; charset=UTF-8",
+			"Content-Type: text/html; charset=UTF-8",
 			"Bcc: " . get_option( 'admin_email' )
 		);
 
+		self::set_smtp();
 		$sent = wp_mail( $to, $subject, $message, $headers );
 
 		if ( $sent ) {
 			Booking_Logger::log_email_sent( $booking_id, $to );
 		} else {
 			Booking_Logger::log_email_error( $booking_id, $to, 'Invio email fallito' );
+		}
+
+		return $sent;
+	}
+
+	/**
+	 * Send cancellation email to client.
+	 */
+	public static function send_cancellation( $booking ) {
+		if(!Booking_Settings::is_send_confirm_email()) {
+			return true;
+		}
+		
+		if ( is_numeric( $booking ) ) {
+			$booking = Booking_DB::get_booking( $booking );
+		}
+
+		if ( ! $booking ) {
+			Booking_Logger::log_email_error( 0, '', 'Prenotazione non trovata per email di cancellazione' );
+			return false;
+		}
+
+		$message = Booking_Settings::get( 'cancellation_email_template' );
+		if ( empty( $message ) ) {
+			return true;
+		}
+
+		$to = $booking->client_email;
+		$subject = 'Cancellazione Prenotazione';
+		$message = self::replace_tokens( $message, $booking );
+
+		$headers = array(
+			"Content-Type: text/html; charset=UTF-8",
+			"Bcc: " . get_option( 'admin_email' )
+		);
+
+		self::set_smtp();
+		$sent = wp_mail( $to, $subject, $message, $headers );
+
+		if ( $sent ) {
+			Booking_Logger::log_email_sent( $booking->id, $to );
+		} else {
+			Booking_Logger::log_email_error( $booking->id, $to, 'Invio email cancellazione fallito' );
 		}
 
 		return $sent;
@@ -122,7 +164,8 @@ class Booking_Email {
 			'{client_section}'   => 'Sezione alunno',
 			'{client_gender}'    => 'Genere alunno',
 			'{status}'           => 'Stato della prenotazione',
-			'{created_at}'       => 'Data e ora di creazione della prenotazione'
+			'{created_at}'       => 'Data e ora di creazione della prenotazione',
+			'{manage_booking_token}' => 'Token per modificare o cancellare la prenotazione'
 		);
 	}
 
@@ -159,7 +202,8 @@ class Booking_Email {
 			'{client_section}'   => isset( $booking->client_section ) ? $booking->client_section : '',
 			'{client_gender}'    => $gender_display,
 			'{status}'           => isset( $booking->status ) ? $booking->status : '',
-			'{created_at}'       => $created_at
+			'{created_at}'       => $created_at,
+			'{manage_booking_token}' => Booking_Security::create_booking_management_token( $booking->id, $booking->client_email )
 		);
 
 		return strtr( $template, $replacements );
@@ -179,11 +223,6 @@ class Booking_Email {
 			return false;
 		}
 
-		if( !Booking_Email::$smtp_initialized ) {
-			Booking_Email::init_smtp();
-			Booking_Email::$smtp_initialized = true;
-		}
-
 		$admin_email = get_option( 'admin_email' );
 		$subject = 'Nuova prenotazione ricevuta';
 		$message = "Una nuova prenotazione è stata ricevuta:\n\n";
@@ -200,6 +239,7 @@ class Booking_Email {
 		$message .= "Data: " . date_i18n( 'd/m/Y', strtotime( $booking->booking_date ) ) . "\n";
 		$message .= "Orario: {$booking->time_slot}\n";
 
+		self::set_smtp();
 		return wp_mail( $admin_email, $subject, $message );
 	}
 }

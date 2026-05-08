@@ -82,9 +82,10 @@ class Booking_Shortcode {
 			'booking-form-script',
 			'BookingData',
 			array(
-				'rest_url' => rest_url( 'booking/v1/' ),
-				'nonce'    => wp_create_nonce( 'booking_nonce' ),
-				'site_url' => site_url(),
+				'rest_url'     => rest_url( 'booking/v1/' ),
+				'nonce'        => wp_create_nonce( 'booking_nonce' ),
+				'site_url'     => site_url(),
+				'manage_token' => self::get_management_token_from_request(),
 			)
 		);
 	}
@@ -93,6 +94,10 @@ class Booking_Shortcode {
 	 * Render booking form
 	 */
 	public static function render_form() {
+		if ( self::is_management_request() ) {
+			return self::render_management_form();
+		}
+
 		$privacy_url = get_privacy_policy_url();
 		if ( empty( $privacy_url ) ) {
 			$privacy_url = home_url( '/privacy-policy/' );
@@ -169,12 +174,12 @@ class Booking_Shortcode {
 							<div class="booking-fields-grid">
 								<div class="form-group">
 									<label for="client-name">Nome dell'alunno *</label>
-									<input type="text" id="client-name" name="client_name" autocomplete="given-name" required />
+									<input type="text" id="client-name" name="client_name" autocomplete="given-name" placeholder="Mario" required />
 								</div>
 
 								<div class="form-group">
 									<label for="client-surname">Cognome dell'alunno *</label>
-									<input type="text" id="client-surname" name="client_surname" autocomplete="family-name" required />
+									<input type="text" id="client-surname" name="client_surname" autocomplete="family-name" placeholder="Rossi" required />
 								</div>
 
 								<div class="form-group">
@@ -207,12 +212,12 @@ class Booking_Shortcode {
 							<div class="booking-fields-grid">
 								<div class="form-group">
 									<label for="client-email">Email accompagnatore *</label>
-									<input type="email" id="client-email" name="client_email" autocomplete="email" required />
+									<input type="email" id="client-email" name="client_email" autocomplete="email" placeholder="lucabianchi@gmail.com" required />
 								</div>
 
 								<div class="form-group">
 									<label for="client-phone">Cellulare accompagnatore *</label>
-									<input type="tel" id="client-phone" name="client_phone" autocomplete="tel" required />
+									<input type="tel" id="client-phone" name="client_phone" autocomplete="tel" placeholder="3334455666" required />
 								</div>
 							</div>
 						</div>
@@ -281,5 +286,169 @@ class Booking_Shortcode {
 		</div>
 		<?php
 		return ob_get_clean();
+	}
+
+	private static function render_management_form() {
+		$token = self::get_management_token_from_request();
+		$booking = self::get_booking_from_management_token( $token );
+
+		ob_start();
+		?>
+		<div class="booking-form-container booking-management-container">
+			<?php if ( is_wp_error( $booking ) ) : ?>
+				<div class="booking-state text-center">
+					<p class="booking-form-kicker">Link non valido</p>
+					<h2>Non possiamo gestire questa prenotazione</h2>
+					<p><?php echo esc_html( $booking->get_error_message() ); ?></p>
+				</div>
+			<?php else : ?>
+				<div class="booking-form-header">
+					<p class="booking-form-kicker">Gestisci prenotazione</p>
+					<h2 class="text-uppercase">Modifica o cancella il tuo appuntamento</h2>
+					<p>Puoi cancellare la prenotazione oppure scegliere una nuova data e un nuovo orario tra quelli disponibili.</p>
+				</div>
+
+				<div class="booking-current-summary">
+					<div>
+						<span>Appuntamento attuale</span>
+						<strong><?php echo esc_html( date_i18n( 'd/m/Y', strtotime( $booking->booking_date ) ) . ' alle ' . substr( $booking->time_slot, 0, 5 ) ); ?></strong>
+					</div>
+					<div>
+						<span>Alunno</span>
+						<strong><?php echo esc_html( trim( $booking->client_name . ' ' . $booking->client_surname ) ); ?></strong>
+					</div>
+					<div>
+						<span>Contatti</span>
+						<strong><?php echo esc_html( $booking->client_email ); ?></strong>
+						<strong><?php echo esc_html( $booking->client_phone ); ?></strong>
+					</div>
+				</div>
+
+				<form id="booking-manage-form" class="booking-form" data-booking-token="<?php echo esc_attr( $token ); ?>">
+					<input type="hidden" id="booking-manage-token" value="<?php echo esc_attr( $token ); ?>" />
+
+					<div class="booking-step booking-step-date is-active">
+						<div class="booking-step-heading">
+							<span class="booking-step-number">1</span>
+							<div>
+								<h3>Scegli la nuova data</h3>
+								<p>Lascia la data attuale oppure seleziona un altro giorno disponibile.</p>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label for="booking-date">Data</label>
+							<input type="text" id="booking-date" name="booking_date" list="booking-date-options" value="<?php echo esc_attr( $booking->booking_date ); ?>" readonly required />
+							<datalist id="booking-date-options"></datalist>
+						</div>
+					</div>
+
+					<div id="booking-slot-step" class="booking-step booking-step-slots" hidden>
+						<div class="booking-step-heading">
+							<span class="booking-step-number">2</span>
+							<div>
+								<h3>Scegli l'orario</h3>
+								<p>Gli slot cambiano in base alla data selezionata.</p>
+							</div>
+						</div>
+
+						<div class="booking-selection-summary">
+							Data selezionata: <strong id="booking-selected-date">-</strong>
+						</div>
+
+						<div class="form-group">
+							<label for="booking-slot">Orario</label>
+							<input type="hidden" id="booking-slot" name="time_slot" value="<?php echo esc_attr( substr( $booking->time_slot, 0, 5 ) ); ?>" />
+							<div id="booking-slot-options" class="booking-slot-options" aria-live="polite">
+								<div class="booking-slot-empty">Seleziona una data per vedere gli orari disponibili</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="booking-selection-summary">
+						Nuovo appuntamento: <strong id="booking-selected-summary">-</strong>
+					</div>
+
+					<div class="booking-management-actions">
+						<button type="submit" class="submit-button">Riprogramma prenotazione</button>
+						<button type="button" id="booking-cancel-reservation" class="submit-button booking-danger-button">Cancella prenotazione</button>
+					</div>
+
+					<div id="form-message" class="form-message" style="display: none;"></div>
+				</form>
+
+				<div id="booking-loading-state" class="booking-state booking-loading-state text-center" hidden>
+					<div class="booking-loading-spinner" aria-hidden="true"></div>
+					<p class="booking-form-kicker">Aggiornamento in corso</p>
+					<h2>Stiamo aggiornando la prenotazione</h2>
+					<p>Non chiudere la pagina: stiamo verificando disponibilita e calendario.</p>
+				</div>
+
+				<div id="booking-success-state" class="booking-state booking-success-state text-center" hidden>
+					<div class="booking-success-icon" aria-hidden="true">
+						<span></span>
+					</div>
+					<p class="booking-form-kicker">Operazione completata</p>
+					<h2 class="text-uppercase">Prenotazione aggiornata</h2>
+					<p id="booking-success-message">La tua richiesta e stata completata correttamente.</p>
+				</div>
+			<?php endif; ?>
+
+			<div id="booking-error-modal" class="booking-error-modal" role="dialog" aria-modal="true" aria-labelledby="booking-error-title" hidden>
+				<div class="booking-error-backdrop" data-booking-error-close></div>
+				<div class="booking-error-card">
+					<button type="button" class="booking-error-close" aria-label="Chiudi avviso" data-booking-error-close>&times;</button>
+					<div class="booking-error-icon" aria-hidden="true">!</div>
+					<p class="booking-form-kicker">Operazione non completata</p>
+					<h2 id="booking-error-title">Si e verificato un errore</h2>
+					<p id="booking-error-text">Non siamo riusciti a completare la richiesta. Riprova tra qualche istante.</p>
+					<button type="button" class="submit-button booking-error-button" data-booking-error-close>Ho capito</button>
+				</div>
+			</div>
+
+			<div id="booking-confirm-cancel-modal" class="booking-error-modal booking-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="booking-confirm-cancel-title" hidden>
+				<div class="booking-error-backdrop" data-booking-confirm-close></div>
+				<div class="booking-error-card">
+					<button type="button" class="booking-error-close" aria-label="Chiudi conferma" data-booking-confirm-close>&times;</button>
+					<div class="booking-confirm-icon" aria-hidden="true">?</div>
+					<p class="booking-form-kicker">Conferma cancellazione</p>
+					<h2 id="booking-confirm-cancel-title">Vuoi cancellare la prenotazione?</h2>
+					<p>Questa operazione libererà lo slot scelto e non potra essere annullata da questa pagina.</p>
+					<div class="booking-confirm-actions">
+						<button type="button" class="submit-button booking-secondary-button" data-booking-confirm-close>Annulla</button>
+						<button type="button" id="booking-confirm-cancel-action" class="submit-button booking-danger-button">Cancella prenotazione</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	private static function is_management_request() {
+		return isset( $_GET['booking_action'], $_GET['token'] ) && 'manage' === sanitize_key( wp_unslash( $_GET['booking_action'] ) );
+	}
+
+	private static function get_management_token_from_request() {
+		return isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+	}
+
+	private static function get_booking_from_management_token( $token ) {
+		$token_data = Booking_Security::validate_booking_management_token( $token );
+
+		if ( is_wp_error( $token_data ) ) {
+			return $token_data;
+		}
+
+		$booking = Booking_DB::get_booking( $token_data['booking_id'] );
+		if ( ! $booking ) {
+			return new WP_Error( 'booking_not_found', 'La prenotazione non esiste piu o e gia stata cancellata.' );
+		}
+
+		if ( strtolower( $booking->client_email ) !== strtolower( $token_data['email'] ) ) {
+			return new WP_Error( 'invalid_token', 'Il link non corrisponde alla prenotazione richiesta.' );
+		}
+
+		return $booking;
 	}
 }

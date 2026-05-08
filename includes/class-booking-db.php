@@ -128,6 +128,26 @@ class Booking_DB {
 	}
 
 	/**
+	 * Update booking date and time slot.
+	 */
+	public static function update_booking_schedule( $booking_id, $booking_date, $time_slot ) {
+		global $wpdb;
+
+		$result = $wpdb->update(
+			$wpdb->prefix . 'bookings',
+			array(
+				'booking_date' => sanitize_text_field( $booking_date ),
+				'time_slot'    => sanitize_text_field( $time_slot ),
+			),
+			array( 'id' => intval( $booking_id ) ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+
+		return $result !== false;
+	}
+
+	/**
 	 * Get booking by ID
 	 */
 	public static function get_booking( $booking_id ) {

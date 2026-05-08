@@ -303,4 +303,97 @@ class Booking_Security {
 
 		return true;
 	}
+
+	/**
+	 * Create an encrypted management token for a booking.
+	 */
+	public static function create_booking_management_token( $booking_id, $email ) {
+		if ( ! function_exists( 'openssl_encrypt' ) ) {
+			return false;
+		}
+
+		$payload = wp_json_encode(
+			array(
+				'id'    => intval( $booking_id ),
+				'email' => sanitize_email( $email ),
+			)
+		);
+
+		$key = self::get_booking_token_key();
+		$iv = openssl_random_pseudo_bytes( 16 );
+		$ciphertext = openssl_encrypt( $payload, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv );
+
+		if ( false === $ciphertext ) {
+			return false;
+		}
+
+		$mac = hash_hmac( 'sha256', $iv . $ciphertext, $key, true );
+		$token_data = array(
+			'iv'   => base64_encode( $iv ),
+			'data' => base64_encode( $ciphertext ),
+			'mac'  => base64_encode( $mac ),
+		);
+
+		return self::base64url_encode( wp_json_encode( $token_data ) );
+	}
+
+	/**
+	 * Decode and verify a booking management token.
+	 */
+	public static function validate_booking_management_token( $token ) {
+		if ( ! function_exists( 'openssl_decrypt' ) || empty( $token ) ) {
+			return new WP_Error( 'invalid_token', 'Link di gestione non valido.' );
+		}
+
+		$decoded = self::base64url_decode( sanitize_text_field( wp_unslash( $token ) ) );
+		$token_data = json_decode( $decoded, true );
+
+		if ( ! is_array( $token_data ) || empty( $token_data['iv'] ) || empty( $token_data['data'] ) || empty( $token_data['mac'] ) ) {
+			return new WP_Error( 'invalid_token', 'Link di gestione non valido.' );
+		}
+
+		$iv = base64_decode( $token_data['iv'], true );
+		$ciphertext = base64_decode( $token_data['data'], true );
+		$mac = base64_decode( $token_data['mac'], true );
+
+		if ( false === $iv || false === $ciphertext || false === $mac ) {
+			return new WP_Error( 'invalid_token', 'Link di gestione non valido.' );
+		}
+
+		$key = self::get_booking_token_key();
+		$expected_mac = hash_hmac( 'sha256', $iv . $ciphertext, $key, true );
+
+		if ( ! hash_equals( $expected_mac, $mac ) ) {
+			return new WP_Error( 'invalid_token', 'Link di gestione non valido.' );
+		}
+
+		$payload = openssl_decrypt( $ciphertext, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv );
+		$data = json_decode( $payload, true );
+
+		if ( ! is_array( $data ) || empty( $data['id'] ) || empty( $data['email'] ) ) {
+			return new WP_Error( 'invalid_token', 'Link di gestione non valido.' );
+		}
+
+		return array(
+			'booking_id' => intval( $data['id'] ),
+			'email'      => sanitize_email( $data['email'] ),
+		);
+	}
+
+	private static function get_booking_token_key() {
+		return hash( 'sha256', wp_salt( 'auth' ) . wp_salt( 'secure_auth' ), true );
+	}
+
+	private static function base64url_encode( $value ) {
+		return rtrim( strtr( base64_encode( $value ), '+/', '-_' ), '=' );
+	}
+
+	private static function base64url_decode( $value ) {
+		$padding = strlen( $value ) % 4;
+		if ( $padding ) {
+			$value .= str_repeat( '=', 4 - $padding );
+		}
+
+		return base64_decode( strtr( $value, '-_', '+/' ) );
+	}
 }

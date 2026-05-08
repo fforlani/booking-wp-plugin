@@ -163,6 +163,53 @@
 	color: var(--booking-surface);
 }
 
+.booking-current-summary {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.booking-current-summary div {
+	padding: 14px;
+	border: 1px solid var(--booking-border);
+	border-radius: 7px;
+	background: var(--booking-neutral-soft);
+}
+
+.booking-current-summary span {
+	display: block;
+	margin-bottom: 5px;
+	color: var(--booking-text-muted);
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.booking-current-summary strong {
+	display: block;
+	color: var(--booking-text);
+	font-size: 14px;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.booking-management-actions {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.booking-danger-button {
+	background: #3f3f46;
+}
+
+.booking-danger-button:hover,
+.booking-danger-button:focus {
+	background: #18181b;
+}
+
 .booking-modal-open {
 	overflow: hidden;
 }
@@ -244,6 +291,32 @@
 	font-weight: 800;
 	box-shadow: inset 0 0 0 2px var(--booking-primary-soft-strong);
 	animation: booking-error-pop 0.34s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.booking-confirm-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 62px;
+	height: 62px;
+	margin: 0 auto 18px;
+	border-radius: 50%;
+	background: var(--booking-neutral-soft);
+	color: var(--booking-primary);
+	font-size: 30px;
+	font-weight: 800;
+	box-shadow: inset 0 0 0 2px var(--booking-primary-soft-strong);
+	animation: booking-error-pop 0.34s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.booking-confirm-actions {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.booking-confirm-actions .submit-button {
+	margin-top: 0;
 }
 
 .booking-error-card h2 {
@@ -659,6 +732,12 @@
 	}
 
 	.booking-success-summary {
+		grid-template-columns: 1fr;
+	}
+
+	.booking-current-summary,
+	.booking-management-actions,
+	.booking-confirm-actions {
 		grid-template-columns: 1fr;
 	}
 }

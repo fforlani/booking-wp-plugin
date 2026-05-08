@@ -105,11 +105,4 @@ class Booking_Availability {
 
 		return $count < $max;
 	}
-
-	/**
-	 * Get count of reservations in a slot
-	 */
-	public static function count_reservations_in_slot( $date, $time_slot ) {
-		return Booking_DB::count_reservations_in_slot( $date, $time_slot );
-	}
 }
