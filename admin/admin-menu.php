@@ -109,6 +109,7 @@ class Booking_Admin {
 		register_setting( 'booking_system_group', 'booking_system_booking_timezone' );
 		register_setting( 'booking_system_group', 'booking_system_admin_email_on_booking' );
 		register_setting( 'booking_system_group', 'booking_system_send_confirmation_email' );
+		register_setting( 'booking_system_group', 'booking_system_confirmation_email_template');
 		register_setting( 'booking_system_group', 'booking_system_google_calendar_enabled' );
 		register_setting( 'booking_system_group', 'booking_system_google_calendar_id' );
 		register_setting('booking_system_group', 'booking_system_rate_limit_enabled');
@@ -232,6 +233,7 @@ class Booking_Admin {
 		}
 
 		$settings = Booking_Settings::get_all();
+		$email_tokens = Booking_Email::get_available_tokens();
 
 		// Check for transient messages
 		$upload_error = get_transient( 'booking_upload_error' );
@@ -482,7 +484,7 @@ class Booking_Admin {
 							</th>
 							<td>
 								<input type="checkbox" id="send_confirmation_email" name="booking_system_send_confirmation_email" value="1" <?php checked( $settings['send_confirmation_email'] ); ?> />
-								<p class="description">Invia email di conferma ai clienti dopo la prenotazione</p>
+								<p class="description">Invia email di conferma ai clienti dopo la prenotazione, e in ccn all'admin</p>
 							</td>
 						</tr>
 						<tr>
@@ -494,6 +496,34 @@ class Booking_Admin {
 								<p class="description">Ricevi notifiche quando viene fatta una prenotazione</p>
 							</td>
 						</tr>
+						<tr>
+							<th scope="row">
+								<label for="confirmation_email_template">Messaggio Email Conferma:</label>
+							</th>
+							<td>
+								<textarea id="confirmation_email_template" name="booking_system_confirmation_email_template" rows="16" style="width: 100%; font-family: monospace;"><?php echo esc_textarea( $settings['confirmation_email_template'] ); ?></textarea>
+								<p class="description">Testo inviato al cliente. Puoi usare i token sotto per inserire automaticamente i dati della prenotazione.</p>
+							</td>
+						</tr>
+					</table>
+
+					<h3>Token disponibili</h3>
+					<p class="description">Inserisci questi token nel messaggio: saranno sostituiti al momento dell'invio.</p>
+					<table class="widefat striped booking-token-table">
+						<thead>
+							<tr>
+								<th>Token</th>
+								<th>Valore sostituito</th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $email_tokens as $token => $description ) { ?>
+								<tr>
+									<td><code><?php echo esc_html( $token ); ?></code></td>
+									<td><?php echo esc_html( $description ); ?></td>
+								</tr>
+							<?php } ?>
+						</tbody>
 					</table>
 				</div>
 
@@ -740,6 +770,13 @@ class Booking_Admin {
 				font-size: 12px;
 				color: #666;
 				margin-top: 5px;
+			}
+			.booking-token-table {
+				max-width: 720px;
+				margin-top: 10px;
+			}
+			.booking-token-table code {
+				user-select: all;
 			}
 		</style>
 		<?php

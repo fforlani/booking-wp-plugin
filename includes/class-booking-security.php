@@ -198,7 +198,7 @@ class Booking_Security {
 		$phone = preg_replace( '/[^0-9+]/', '', $phone );
 
 		// Validate length (international format)
-		if ( strlen( $phone ) < 10 || strlen( $phone ) > 15 ) {
+		if ( strlen( $phone ) < 9 || strlen( $phone ) > 15 ) {
 			return false;
 		}
 

@@ -37,7 +37,7 @@ class Booking_DB {
 			KEY booking_date_idx (booking_date),
 			KEY time_slot_idx (time_slot),
 			KEY status_idx (status),
-			UNIQUE KEY unique_booking (booking_date, time_slot, client_email)
+			UNIQUE KEY unique_booking (booking_date, time_slot, client_name, client_surname)
 		) {$charset_collate};
 		";
 
@@ -142,6 +142,26 @@ class Booking_DB {
 	}
 
 	/**
+	 * Delete booking by ID
+	 */
+	public static function delete_booking( $booking_id ) {
+		global $wpdb;
+
+		$booking_id = intval( $booking_id );
+		if ( $booking_id <= 0 ) {
+			return false;
+		}
+
+		$result = $wpdb->delete(
+			$wpdb->prefix . 'bookings',
+			array( 'id' => $booking_id ),
+			array( '%d' )
+		);
+
+		return $result > 0;
+	}
+
+	/**
 	 * Count reservations for a specific slot
 	 */
 	public static function count_reservations_in_slot( $booking_date, $time_slot ) {
@@ -215,7 +235,7 @@ class Booking_DB {
 		global $wpdb;
 
 		$query = $wpdb->prepare(
-			"SELECT * FROM {$wpdb->prefix}booking_logs ORDER BY timestamp DESC LIMIT %d OFFSET %d",
+			"SELECT * FROM {$wpdb->prefix}booking_logs ORDER BY id DESC LIMIT %d OFFSET %d",
 			intval( $limit ),
 			intval( $offset )
 		);

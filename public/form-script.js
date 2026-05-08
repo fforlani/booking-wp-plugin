@@ -9,6 +9,16 @@ jQuery(document).ready(function($) {
 	const selectedSummary = $('#booking-selected-summary');
 	const message = $('#form-message');
 	const dateOptions = $('#booking-date-options');
+	const formHeader = $('.booking-form-header');
+	const loadingState = $('#booking-loading-state');
+	const successState = $('#booking-success-state');
+	const successMessage = $('#booking-success-message');
+	const successWhen = $('#booking-success-when');
+	const successStudent = $('#booking-success-student');
+	const successContact = $('#booking-success-contact');
+	const newReservationButton = $('#booking-new-reservation');
+	const errorModal = $('#booking-error-modal');
+	const errorText = $('#booking-error-text');
 	let availableDates = [];
 	let calendar = null;
 
@@ -35,6 +45,9 @@ jQuery(document).ready(function($) {
 		calendar = flatpickr(dateInput[0], {
 			inline: true,
 			dateFormat: 'Y-m-d',
+			altInput: true,
+			altFormat: 'd-m-Y',
+			altInputClass: 'booking-date-display',
 			disableMobile: true,
 			locale: italianLocale,
 			minDate: today,
@@ -50,6 +63,7 @@ jQuery(document).ready(function($) {
 				}
 			},
 			onChange: function(selectedDates, dateStr) {
+				blurCalendarFocus();
 				handleDateChange(dateStr);
 			}
 		});
@@ -168,10 +182,12 @@ jQuery(document).ready(function($) {
 				} else {
 					resetSlots('Nessun orario disponibile');
 				}
+				scrollToStep(slotStep);
 			},
 			error: function() {
 				resetSlots('Errore nel caricamento degli orari');
 				showMessage('Errore nel caricamento degli slot', 'error');
+				scrollToStep(slotStep);
 			}
 		});
 	}
@@ -181,7 +197,7 @@ jQuery(document).ready(function($) {
 
 		slots.forEach(function(slot) {
 			const slotTime = escapeHtml(slot.time);
-			const availabilityLabel = slot.available_spots === 1 ? '1 disponibilita' : slot.available_spots + ' disponibilita';
+			const availabilityLabel = slot.available_spots === 1 ? '1 disponibilità' : slot.available_spots + ' disponibilità';
 
 			html += '<button type="button" class="booking-slot-button" data-slot="' + slotTime + '" aria-pressed="false">';
 			html += '<span class="booking-slot-time">' + slotTime + '</span>';
@@ -232,6 +248,7 @@ jQuery(document).ready(function($) {
 		slotInput.val(button.data('slot'));
 		selectedSummary.text(formatDisplayDate(dateInput.val()) + ' alle ' + button.data('slot'));
 		showStep(detailsStep);
+		scrollToStep(detailsStep);
 	});
 
 	function showStep(step) {
@@ -240,6 +257,34 @@ jQuery(document).ready(function($) {
 
 	function hideStep(step) {
 		step.prop('hidden', true).removeClass('is-active');
+	}
+
+	function scrollToStep(step) {
+		if (!step.length || step.prop('hidden')) {
+			return;
+		}
+
+		window.setTimeout(function() {
+			const offset = 24;
+			const top = step.offset().top - offset;
+
+			window.scrollTo({
+				top: top,
+				behavior: 'smooth'
+			});
+		}, 120);
+	}
+
+	function blurCalendarFocus() {
+		if (calendar && calendar._input) {
+			calendar._input.blur();
+		}
+
+		dateInput.blur();
+
+		if (document.activeElement && typeof document.activeElement.blur === 'function') {
+			document.activeElement.blur();
+		}
 	}
 
 	function formatDisplayDate(dateString) {
@@ -266,6 +311,12 @@ jQuery(document).ready(function($) {
 			return;
 		}
 
+		if (!$('#privacy-consent').is(':checked')) {
+			showMessage('Accetta l\'informativa privacy per completare la prenotazione.', 'error');
+			scrollToStep(detailsStep);
+			return;
+		}
+
 		const formData = {
 			booking_date: $('#booking-date').val(),
 			time_slot: slotInput.val(),
@@ -274,8 +325,11 @@ jQuery(document).ready(function($) {
 			client_gender: $('#client-gender').val(),
 			client_section: $('#client-section').val(),
 			client_email: $('#client-email').val(),
-			client_phone: $('#client-phone').val()
+			client_phone: $('#client-phone').val(),
+			privacy_consent: $('#privacy-consent').is(':checked') ? '1' : ''
 		};
+
+		showLoadingState();
 
 		$.ajax({
 			url: BookingData.rest_url + 'reserve',
@@ -286,18 +340,10 @@ jQuery(document).ready(function($) {
 			},
 			success: function(response) {
 				if (response.success) {
-					showMessage(response.message, 'success');
-					form[0].reset();
-					if (calendar) {
-						calendar.clear();
-					}
-					resetSlots('Seleziona una data per vedere gli orari disponibili');
-					selectedDateLabel.text('-');
-					hideStep(slotStep);
-					hideStep(detailsStep);
-					loadAvailableDates();
+					showSuccessState(formData, response.message);
 				} else {
-					showMessage('Errore durante la prenotazione', 'error');
+					showFormState();
+					showErrorPopup('Errore durante la prenotazione. Riprova tra qualche istante.');
 				}
 			},
 			error: function(xhr) {
@@ -305,9 +351,74 @@ jQuery(document).ready(function($) {
 				if (xhr.responseJSON && xhr.responseJSON.message) {
 					errorMsg = xhr.responseJSON.message;
 				}
-				showMessage(errorMsg, 'error');
+				showFormState();
+				showErrorPopup(errorMsg);
 			}
 		});
+	});
+
+	newReservationButton.on('click', function() {
+		resetBookingForm();
+		showFormState();
+		loadAvailableDates();
+	});
+
+	function showLoadingState() {
+		message.hide().stop(true, true);
+		formHeader.prop('hidden', true);
+		form.prop('hidden', true);
+		successState.prop('hidden', true);
+		loadingState.prop('hidden', false);
+	}
+
+	function showSuccessState(formData, responseMessage) {
+		loadingState.prop('hidden', true);
+		formHeader.prop('hidden', true);
+		form.prop('hidden', true);
+		successMessage.text(responseMessage || 'La tua prenotazione è stata registrata correttamente.');
+		successWhen.text(formatDisplayDate(formData.booking_date) + ' alle ' + formData.time_slot);
+		successStudent.text($.trim(formData.client_name + ' ' + formData.client_surname));
+		successContact.text(formData.client_email + ' - ' + formData.client_phone);
+		successState.prop('hidden', false);
+	}
+
+	function showFormState() {
+		loadingState.prop('hidden', true);
+		successState.prop('hidden', true);
+		formHeader.prop('hidden', false);
+		form.prop('hidden', false);
+	}
+
+	function resetBookingForm() {
+		form[0].reset();
+		if (calendar) {
+			calendar.clear();
+		}
+		resetSlots('Seleziona una data per vedere gli orari disponibili');
+		selectedDateLabel.text('-');
+		hideStep(slotStep);
+		hideStep(detailsStep);
+	}
+
+	function showErrorPopup(text) {
+		errorText.text(text || 'Non siamo riusciti a completare la prenotazione. Riprova tra qualche istante.');
+		errorModal.prop('hidden', false);
+		$('body').addClass('booking-modal-open');
+	}
+
+	function hideErrorPopup() {
+		errorModal.prop('hidden', true);
+		$('body').removeClass('booking-modal-open');
+	}
+
+	errorModal.on('click', '[data-booking-error-close]', function() {
+		hideErrorPopup();
+	});
+
+	$(document).on('keydown', function(e) {
+		if (e.key === 'Escape' && !errorModal.prop('hidden')) {
+			hideErrorPopup();
+		}
 	});
 
 	function showMessage(text, type) {

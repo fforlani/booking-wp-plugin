@@ -181,6 +181,7 @@ class Booking_REST_API {
 
 		// Create reservation
 		$booking_id = Booking_Reservation::create( $sanitized_data );
+		$booking = Booking_DB::get_booking( $booking_id );
 
 		if ( is_wp_error( $booking_id ) ) {
 			Booking_Security::increment_rate_limit();
@@ -190,7 +191,11 @@ class Booking_REST_API {
 
 		// Send confirmation email
 		if(Booking_Settings::is_send_confirm_email()) {
-			Booking_Email::send_confirmation( $booking_id );
+			$sent = Booking_Email::send_confirmation( $booking_id );
+			if(! $sent) {
+				Booking_DB::delete_booking( $booking_id );
+				return new WP_Error( 'email_sending_failed', "Errore nell'invio della mail", array( 'status' => 400 ) );
+			}
 		}
 
 		// Send admin notification
@@ -200,19 +205,29 @@ class Booking_REST_API {
 
 		// Add to Google Calendar
 		if (Booking_Settings::get( 'google_calendar_enabled' ) ) {
-			Booking_Google_Calendar::add_event( $booking_id );
+			$added = Booking_Google_Calendar::add_event( $booking_id );
+			if( !$added ) {
+				// retry, if not possible rollback
+				$added = Booking_Google_Calendar::add_event( $booking_id );
+			}
+			if( !$added ) {
+				Booking_DB::delete_booking( $booking_id );
+				return new WP_Error( 'email_sending_failed', "errore nell'invio della mail", array( 'status' => 400 ) );
+			}
 		}
+		
+
+		// Log success
+		Booking_Logger::log_success( $booking_id, $booking->client_email );
 
 		// Reset rate limit on successful booking
 		// Booking_Security::reset_rate_limit();
-
-		$booking = Booking_DB::get_booking( $booking_id );
 
 		return array(
 			'success'    => true,
 			'booking_id' => $booking_id,
 			'booking'    => $booking,
-			'message'    => 'Prenotazione confermata!',
+			'message'    => 'Ti abbiamo inviato un’email con la conferma e tutte le informazioni utili',
 		);
 	}
 }

@@ -76,13 +76,6 @@ class Booking_Reservation {
 				return new WP_Error( 'slot_unavailable', 'Slot non disponibile' );
 			}
 
-			// Check if email already has booking in this slot
-			if ( Booking_DB::has_email_booking_in_slot( $date, $time_slot, $email ) ) {
-				$wpdb->query( 'ROLLBACK' );
-				Booking_Logger::log_error( $email, 'Hai già una prenotazione per questo slot', null );
-				return new WP_Error( 'duplicate_booking', 'Hai già una prenotazione per questo slot' );
-			}
-
 			// Create booking
 			$booking_id = Booking_DB::create_booking( $data );
 			if ( is_wp_error( $booking_id ) || ! $booking_id ) {
@@ -93,9 +86,6 @@ class Booking_Reservation {
 
 			// Commit transaction
 			$wpdb->query( 'COMMIT' );
-
-			// Log success
-			Booking_Logger::log_success( $booking_id, $email );
 
 			return $booking_id;
 
