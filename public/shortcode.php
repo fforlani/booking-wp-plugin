@@ -107,8 +107,8 @@ class Booking_Shortcode {
 		?>
 		<div class="booking-form-container">
 			<div class="booking-form-header">
-				<p class="booking-form-kicker">Prenotazione prova taglie</p>
-				<h2 class="text-uppercase">Prenota il tuo appuntamento</h2>
+				<p class="booking-form-kicker">Prenota il tuo appuntamento</p>
+				<h2 class="text-uppercase">Prenotazione prova taglie</h2>
 				<p>Scegli una data disponibile, seleziona l'orario e completa i dati richiesti.</p>
 			</div>
 
@@ -385,7 +385,7 @@ class Booking_Shortcode {
 					<div class="booking-loading-spinner" aria-hidden="true"></div>
 					<p class="booking-form-kicker">Aggiornamento in corso</p>
 					<h2>Stiamo aggiornando la prenotazione</h2>
-					<p>Non chiudere la pagina: stiamo verificando disponibilita e calendario.</p>
+					<p>Non chiudere la pagina: stiamo verificando disponibilità e calendario.</p>
 				</div>
 
 				<div id="booking-success-state" class="booking-state booking-success-state text-center" hidden>
@@ -447,6 +447,10 @@ class Booking_Shortcode {
 		$booking = Booking_DB::get_booking( $token_data['booking_id'] );
 		if ( ! $booking ) {
 			return new WP_Error( 'booking_not_found', 'La prenotazione non esiste piu o e gia stata cancellata.' );
+		}
+
+		if ( 'cancelled' === strtolower( (string) $booking->status ) ) {
+			return new WP_Error( 'booking_cancelled', 'La prenotazione e gia stata cancellata.' );
 		}
 
 		if ( strtolower( $booking->client_email ) !== strtolower( $token_data['email'] ) ) {

@@ -242,13 +242,14 @@ class Booking_REST_API {
 
 		// Create reservation
 		$booking_id = Booking_Reservation::create( $sanitized_data );
-		$booking = Booking_DB::get_booking( $booking_id );
 
 		if ( is_wp_error( $booking_id ) ) {
 			Booking_Security::increment_rate_limit();
 			Booking_Logger::log_action( null, 'reservation_failed', $booking_id->get_error_message(), $sanitized_data['client_email'] );
 			return new WP_Error( 'reservation_failed', Booking_Security::get_safe_error_message( 'database_error' ), array( 'status' => 400 ) );
 		}
+
+		$booking = Booking_DB::get_booking( $booking_id );
 
 		// Add to Google Calendar
 		if (Booking_Settings::get( 'google_calendar_enabled' ) ) {
@@ -258,7 +259,7 @@ class Booking_REST_API {
 				$added = Booking_Google_Calendar::add_event( $booking_id );
 			}
 			if( !$added ) {
-				Booking_DB::delete_booking( $booking_id );
+				Booking_DB::cancel_booking( $booking_id );
 				return new WP_Error( 'email_sending_failed', "errore nell'invio della mail", array( 'status' => 400 ) );
 			}
 		}
@@ -266,7 +267,7 @@ class Booking_REST_API {
 		// Send confirmation email
 		$sent = Booking_Email::send_confirmation( $booking_id );
 		if(! $sent) {
-			Booking_DB::delete_booking( $booking_id );
+			Booking_DB::cancel_booking( $booking_id );
 			Booking_Google_Calendar::delete_event( $booking_id );
 			return new WP_Error( 'email_sending_failed', "Errore nell'invio della mail", array( 'status' => 400 ) );
 		}
@@ -302,6 +303,10 @@ class Booking_REST_API {
 			return new WP_Error( 'booking_not_found', 'Prenotazione non trovata.', array( 'status' => 404 ) );
 		}
 
+		if ( 'cancelled' === strtolower( (string) $booking->status ) ) {
+			return new WP_Error( 'booking_cancelled', 'La prenotazione e gia stata cancellata.', array( 'status' => 404 ) );
+		}
+
 		if ( strtolower( $booking->client_email ) !== strtolower( $token_data['email'] ) ) {
 			return new WP_Error( 'invalid_token', 'Link di gestione non valido.', array( 'status' => 403 ) );
 		}
@@ -317,12 +322,12 @@ class Booking_REST_API {
 			}
 		}
 
-		Booking_Logger::log_action( $booking->id, 'booking_cancelled_by_customer', 'Prenotazione cancellata dal link pubblico.', $booking->client_email );
-
-		if ( ! Booking_DB::delete_booking( $booking->id ) ) {
+		if ( ! Booking_DB::cancel_booking( $booking->id ) ) {
 			return new WP_Error( 'delete_failed', 'Non siamo riusciti a cancellare la prenotazione.', array( 'status' => 400 ) );
 		}
 
+		$booking->status = 'cancelled';
+		Booking_Logger::log_action( $booking->id, 'booking_cancelled_by_customer', 'Prenotazione cancellata dal link pubblico.', $booking->client_email );
 		Booking_Email::send_cancellation( $booking );
 
 		return array(

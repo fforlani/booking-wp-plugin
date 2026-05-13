@@ -15,6 +15,7 @@ class Booking_Admin {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
+		add_action( 'admin_init', array( __CLASS__, 'handle_booking_admin_actions' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_admin_assets' ) );
 	}
 
@@ -221,6 +222,57 @@ class Booking_Admin {
 	 */
 	private static function has_google_credentials() {
 		return Booking_Google_Calendar::get_credentials() !== null;
+	}
+
+	/**
+	 * Handle actions from the bookings admin table.
+	 */
+	public static function handle_booking_admin_actions() {
+		if ( ! is_admin() || ! isset( $_GET['page'], $_GET['booking_action'], $_GET['booking_id'] ) ) {
+			return;
+		}
+
+		if ( 'booking-bookings' !== sanitize_key( wp_unslash( $_GET['page'] ) ) || 'cancel' !== sanitize_key( wp_unslash( $_GET['booking_action'] ) ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Accesso negato' );
+		}
+
+		$booking_id = intval( $_GET['booking_id'] );
+		check_admin_referer( 'booking_cancel_booking_' . $booking_id );
+
+		$booking = Booking_DB::get_booking( $booking_id );
+		if ( ! $booking ) {
+			set_transient( 'booking_admin_error', 'Prenotazione non trovata.', 10 );
+			wp_safe_redirect( admin_url( 'admin.php?page=booking-bookings' ) );
+			exit;
+		}
+
+		if ( 'cancelled' === strtolower( (string) $booking->status ) ) {
+			set_transient( 'booking_admin_error', 'La prenotazione e gia cancellata.', 10 );
+			wp_safe_redirect( admin_url( 'admin.php?page=booking-bookings' ) );
+			exit;
+		}
+
+		if ( Booking_Settings::get( 'google_calendar_enabled' ) && ! empty( $booking->google_event_id ) ) {
+			$deleted = Booking_Google_Calendar::delete_event( $booking->id );
+		}
+
+		if ( ! Booking_DB::cancel_booking( $booking->id ) ) {
+			set_transient( 'booking_admin_error', 'Non siamo riusciti a cancellare la prenotazione.', 10 );
+			wp_safe_redirect( admin_url( 'admin.php?page=booking-bookings' ) );
+			exit;
+		}
+
+		$booking->status = 'cancelled';
+		Booking_Logger::log_action( $booking->id, 'booking_cancelled_by_admin', 'Prenotazione cancellata dalla sezione admin.', $booking->client_email );
+		Booking_Email::send_cancellation( $booking );
+
+		set_transient( 'booking_admin_success', 'Prenotazione cancellata correttamente.', 10 );
+		wp_safe_redirect( admin_url( 'admin.php?page=booking-bookings' ) );
+		exit;
 	}
 
 	/**
@@ -800,10 +852,26 @@ class Booking_Admin {
 
 		global $wpdb;
 		$bookings = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}bookings ORDER BY booking_date DESC, time_slot DESC LIMIT 100" );
+		$admin_error = get_transient( 'booking_admin_error' );
+		$admin_success = get_transient( 'booking_admin_success' );
 
 		?>
 		<div class="wrap">
 			<h1>Booking System - Prenotazioni</h1>
+
+			<?php if ( $admin_error ) { ?>
+				<div class="notice notice-error is-dismissible">
+					<p><?php echo esc_html( $admin_error ); ?></p>
+				</div>
+				<?php delete_transient( 'booking_admin_error' ); ?>
+			<?php } ?>
+
+			<?php if ( $admin_success ) { ?>
+				<div class="notice notice-success is-dismissible">
+					<p><?php echo esc_html( $admin_success ); ?></p>
+				</div>
+				<?php delete_transient( 'booking_admin_success' ); ?>
+			<?php } ?>
 
 			<?php if ( ! empty( $bookings ) ) { ?>
 				<p>Totale prenotazioni: <strong><?php echo esc_html( count( $bookings ) ); ?></strong></p>
@@ -822,6 +890,7 @@ class Booking_Admin {
 						<th>Orario</th>
 						<th>Status</th>
 						<th>Data Creazione</th>
+						<th>Azioni</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -841,6 +910,32 @@ class Booking_Admin {
 								</span>
 							</td>
 							<td><?php echo esc_html( date_i18n( 'd/m/Y H:i', strtotime( $booking->created_at ) ) ); ?></td>
+							<td>
+								<?php if ( 'cancelled' !== strtolower( (string) $booking->status ) ) { ?>
+									<?php
+									$cancel_url = wp_nonce_url(
+										add_query_arg(
+											array(
+												'page'           => 'booking-bookings',
+												'booking_action' => 'cancel',
+												'booking_id'     => intval( $booking->id ),
+											),
+											admin_url( 'admin.php' )
+										),
+										'booking_cancel_booking_' . intval( $booking->id )
+									);
+									?>
+									<a
+										class="button button-small"
+										href="<?php echo esc_url( $cancel_url ); ?>"
+										onclick="return confirm('Vuoi cancellare questa prenotazione?');"
+									>
+										Cancella
+									</a>
+								<?php } else { ?>
+									-
+								<?php } ?>
+							</td>
 						</tr>
 					<?php } ?>
 				</tbody>

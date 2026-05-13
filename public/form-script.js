@@ -212,7 +212,7 @@ jQuery(document).ready(function($) {
 
 		slots.forEach(function(slot) {
 			const slotTime = escapeHtml(slot.time);
-			const availabilityLabel = slot.is_current ? 'orario attuale' : (slot.available_spots === 1 ? '1 disponibilita' : slot.available_spots + ' disponibilita');
+			const availabilityLabel = slot.is_current ? 'orario attuale' : (slot.available_spots === 1 ? '1 disponibilità' : slot.available_spots + ' disponibilità');
 			const isSelected = selectedSlot === slot.time;
 
 			html += '<button type="button" class="booking-slot-button' + (isSelected ? ' selected' : '') + '" data-slot="' + slotTime + '" aria-pressed="' + (isSelected ? 'true' : 'false') + '">';

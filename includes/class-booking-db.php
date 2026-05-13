@@ -36,8 +36,7 @@ class Booking_DB {
 			PRIMARY KEY (id),
 			KEY booking_date_idx (booking_date),
 			KEY time_slot_idx (time_slot),
-			KEY status_idx (status),
-			UNIQUE KEY unique_booking (booking_date, time_slot, client_name, client_surname)
+			KEY status_idx (status)
 		) {$charset_collate};
 		";
 
@@ -83,7 +82,7 @@ class Booking_DB {
 				'client_gender'   => ! empty( $data['client_gender'] ) ? sanitize_text_field( $data['client_gender'] ) : null,
 				'status'          => 'confirmed',
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false === $result ) {
@@ -103,6 +102,28 @@ class Booking_DB {
 			$wpdb->prefix . 'bookings',
 			array( 'status' => sanitize_text_field( $status ) ),
 			array( 'id' => intval( $booking_id ) ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		return $result !== false;
+	}
+
+	/**
+	 * Soft delete booking by marking it as cancelled.
+	 */
+	public static function cancel_booking( $booking_id ) {
+		global $wpdb;
+
+		$booking_id = intval( $booking_id );
+		if ( $booking_id <= 0 || ! self::get_booking( $booking_id ) ) {
+			return false;
+		}
+
+		$result = $wpdb->update(
+			$wpdb->prefix . 'bookings',
+			array( 'status' => 'cancelled' ),
+			array( 'id' => $booking_id ),
 			array( '%s' ),
 			array( '%d' )
 		);
@@ -159,26 +180,6 @@ class Booking_DB {
 		);
 
 		return $wpdb->get_row( $query );
-	}
-
-	/**
-	 * Delete booking by ID
-	 */
-	public static function delete_booking( $booking_id ) {
-		global $wpdb;
-
-		$booking_id = intval( $booking_id );
-		if ( $booking_id <= 0 ) {
-			return false;
-		}
-
-		$result = $wpdb->delete(
-			$wpdb->prefix . 'bookings',
-			array( 'id' => $booking_id ),
-			array( '%d' )
-		);
-
-		return $result > 0;
 	}
 
 	/**
