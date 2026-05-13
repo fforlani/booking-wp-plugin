@@ -223,7 +223,7 @@ class Booking_REST_API {
 		}
 
 		if ( ! $sanitized_data['client_section'] ) {
-			$validation_errors[] = 'Sezione non valida';
+			$validation_errors[] = 'Classe non valida';
 		}
 
 		if ( ! $sanitized_data['client_email'] ) {

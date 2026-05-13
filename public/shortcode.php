@@ -169,6 +169,7 @@ class Booking_Shortcode {
 							<div class="booking-fieldset-heading">
 								<h4>Informazioni sull'alunno</h4>
 								<p>Inserisci i dati dello studente per cui stai prenotando l'appuntamento.</p>
+								<p>* Campi obbligatori</p>
 							</div>
 
 							<div class="booking-fields-grid">
@@ -192,12 +193,14 @@ class Booking_Shortcode {
 								</div>
 
 								<div class="form-group">
-									<label for="client-section">Futura sezione *</label>
+									<label for="client-section">Futura classe *</label>
 									<select id="client-section" name="client_section" required>
 										<option disabled selected value="">Seleziona</option>
 										<option value="1">1&ordf;</option>
 										<option value="2">2&ordf;</option>
 										<option value="3">3&ordf;</option>
+										<option value="4">4&ordf;</option>
+										<option value="5">5&ordf;</option>
 									</select>
 								</div>
 							</div>
@@ -205,18 +208,19 @@ class Booking_Shortcode {
 
 						<div class="booking-fieldset">
 							<div class="booking-fieldset-heading">
-								<h4>Recapiti dell'accompagnatore</h4>
-								<p>Indica email e cellulare della persona che accompagnerà l'alunno: genitore, parente, amico o altro accompagnatore, purchè maggiorenne.</p>
+								<h4>Recapiti del genitore</h4>
+								<p>Indica email e cellulare della persona che accompagnerà l'alunno: genitore, parente, amico o altro genitore, purchè maggiorenne.</p>
+								<p>* Campi obbligatori</p>
 							</div>
 
 							<div class="booking-fields-grid">
 								<div class="form-group">
-									<label for="client-email">Email accompagnatore *</label>
+									<label for="client-email">Email genitore *</label>
 									<input type="email" id="client-email" name="client_email" autocomplete="email" placeholder="lucabianchi@gmail.com" required />
 								</div>
 
 								<div class="form-group">
-									<label for="client-phone">Cellulare accompagnatore *</label>
+									<label for="client-phone">Cellulare genitore *</label>
 									<input type="tel" id="client-phone" name="client_phone" autocomplete="tel" placeholder="3334455666" required />
 								</div>
 							</div>
@@ -265,7 +269,7 @@ class Booking_Shortcode {
 						<strong id="booking-success-student">-</strong>
 					</div>
 					<div>
-						<span>Accompagnatore</span>
+						<span>Genitore</span>
 						<strong id="booking-success-contact">-</strong>
 					</div>
 				</div>

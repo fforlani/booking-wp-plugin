@@ -815,7 +815,7 @@ class Booking_Admin {
 						<th>ID</th>
 						<th>Nome</th>
 						<th>Genere</th>
-						<th>Sezione</th>
+						<th>Classe</th>
 						<th>Email</th>
 						<th>Telefono</th>
 						<th>Data</th>

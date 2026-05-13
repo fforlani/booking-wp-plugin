@@ -156,12 +156,12 @@ class Booking_Email {
 			'{booking_date}'     => 'Data prenotazione formattata (es: 03/06/2026)',
 			'{booking_date_raw}' => 'Data prenotazione nel formato salvato (YYYY-MM-DD)',
 			'{time_slot}'        => 'Orario della prenotazione',
-			'{client_name}'      => 'Nome accompagnatore',
-			'{client_surname}'   => 'Cognome accompagnatore',
-			'{client_full_name}' => 'Nome e cognome accompagnatore',
-			'{client_email}'     => 'Email accompagnatore',
-			'{client_phone}'     => 'Telefono accompagnatore',
-			'{client_section}'   => 'Sezione alunno',
+			'{client_name}'      => 'Nome genitore',
+			'{client_surname}'   => 'Cognome genitore',
+			'{client_full_name}' => 'Nome e cognome genitore',
+			'{client_email}'     => 'Email genitore',
+			'{client_phone}'     => 'Telefono genitore',
+			'{client_section}'   => 'Classe alunno',
 			'{client_gender}'    => 'Genere alunno',
 			'{status}'           => 'Stato della prenotazione',
 			'{created_at}'       => 'Data e ora di creazione della prenotazione',
@@ -227,7 +227,7 @@ class Booking_Email {
 		$subject = 'Nuova prenotazione ricevuta';
 		$message = "Una nuova prenotazione è stata ricevuta:\n\n";
 		$message .= "Nome: {$booking->client_name} {$booking->client_surname}\n";
-		$message .= "Sezione: {$booking->client_section}\n";
+		$message .= "Classe: {$booking->client_section}\n";
 		
 		if ( ! empty( $booking->client_gender ) ) {
 			$gender_display = 'M' === $booking->client_gender ? 'Maschio' : 'Femmina';
