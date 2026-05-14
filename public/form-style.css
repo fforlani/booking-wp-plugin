@@ -14,10 +14,10 @@
 	--booking-neutral-strong: #f1f5f9;
 	--booking-surface: #ffffff;
 	--booking-surface-subtle: #fafafa;
-	max-width: 920px;
 	margin: 28px auto;
 	color: var(--booking-text);
 	font-family: 'Montserrat', sans-serif;
+	max-width: 100%;
 }
 
 .booking-form-container * {
@@ -47,6 +47,7 @@
 	color: var(--booking-text);
 	font-size: 30px;
 	line-height: 1.15;
+	letter-spacing: normal;
 }
 
 .booking-form-header p:last-child {
@@ -72,6 +73,7 @@
 
 .booking-state h2 {
 	margin: 10px 0;
+	letter-spacing: normal;
 }
 
 .booking-state > p:last-of-type {
@@ -324,6 +326,7 @@
 	color: var(--booking-text);
 	font-size: 24px;
 	line-height: 1.2;
+	letter-spacing: normal;
 }
 
 .booking-error-card p:not(.booking-form-kicker) {
@@ -382,6 +385,7 @@
 	color: var(--booking-text);
 	font-size: 19px;
 	line-height: 1.25;
+	letter-spacing: normal !important;
 }
 
 .booking-step-heading p {
@@ -725,6 +729,7 @@
 
 	.booking-form-container h2 {
 		font-size: 25px;
+		letter-spacing: normal;
 	}
 
 	.booking-fields-grid {
@@ -812,4 +817,19 @@
 		opacity: 1;
 		transform: scale(1);
 	}
+}
+
+
+/*css added to overwrite salient css*/
+
+
+#booking-form input {
+    background-color: white;
+}
+
+#booking-form button, #booking-manage-form button {
+	text-transform: none !important;
+    font-size: 18px;
+    letter-spacing: normal;
+    font-weight: bold;
 }

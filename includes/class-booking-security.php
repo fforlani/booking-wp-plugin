@@ -26,6 +26,15 @@ class Booking_Security {
 	}
 
 	/**
+	 * Check if reCAPTCHA v3 is enabled and fully configured.
+	 */
+	public static function is_recaptcha_enabled() {
+		return (bool) Booking_Settings::get( 'enable_recaptcha', false )
+			&& '' !== trim( (string) Booking_Settings::get( 'recaptcha_site_key', '' ) )
+			&& '' !== trim( (string) Booking_Settings::get( 'recaptcha_secret_key', '' ) );
+	}
+
+	/**
 	 * Check rate limit for IP
 	 */
 	public static function check_rate_limit( $ip = null ) {
@@ -118,11 +127,14 @@ class Booking_Security {
 	 * Validate CAPTCHA response (reCAPTCHA v3)
 	 */
 	public static function validate_recaptcha( $token ) {
+		if ( ! self::is_recaptcha_enabled() ) {
+			return true;
+		}
+
 		$secret_key = Booking_Settings::get( 'recaptcha_secret_key' );
 
-		if ( ! $secret_key || ! $token ) {
-			// If not configured, skip validation
-			return true;
+		if ( ! $token ) {
+			return false;
 		}
 
 		$response = wp_remote_post(
@@ -131,6 +143,7 @@ class Booking_Security {
 				'body' => array(
 					'secret'   => $secret_key,
 					'response' => $token,
+					'remoteip' => self::get_client_ip(),
 				),
 			)
 		);
@@ -144,9 +157,14 @@ class Booking_Security {
 		$data = json_decode( $body, true );
 
 		// Score threshold (0.0 to 1.0, higher = more likely human)
-		$threshold = apply_filters( 'booking_recaptcha_threshold', 0.5 );
+		$threshold = (float) apply_filters( 'booking_recaptcha_threshold', Booking_Settings::get( 'recaptcha_threshold', 0.5 ) );
 
-		if ( isset( $data['success'] ) && $data['success'] && isset( $data['score'] ) && $data['score'] >= $threshold ) {
+		if (
+			isset( $data['success'], $data['score'] )
+			&& $data['success']
+			&& $data['score'] >= $threshold
+			&& ( empty( $data['action'] ) || 'booking_reserve' === $data['action'] )
+		) {
 			return true;
 		}
 

@@ -3,7 +3,7 @@
  * Plugin Name: Booking System
  * Description: Gestisci prenotazioni con slot orari, Google Calendar e email di conferma
  * Version: 1.0.0
- * Author: Dev Team
+ * Author: Fede&Fede
  * License: GPL-2.0-or-later
  * Text Domain: booking-system
  * Domain Path: /languages

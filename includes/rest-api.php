@@ -121,6 +121,11 @@ class Booking_REST_API {
 	 * Cancel an existing reservation from a signed public token.
 	 */
 	public static function cancel_reservation_request( $request ) {
+		$nonce_check = self::verify_request_nonce( $request );
+		if ( is_wp_error( $nonce_check ) ) {
+			return $nonce_check;
+		}
+
 		$data = $request->get_json_params();
 		if ( ! is_array( $data ) ) {
 			return new WP_Error( 'invalid_data', 'Dati non validi.', array( 'status' => 400 ) );
@@ -140,6 +145,11 @@ class Booking_REST_API {
 	 * Reschedule an existing reservation from a signed public token.
 	 */
 	public static function reschedule_reservation_request( $request ) {
+		$nonce_check = self::verify_request_nonce( $request );
+		if ( is_wp_error( $nonce_check ) ) {
+			return $nonce_check;
+		}
+
 		$data = $request->get_json_params();
 		if ( ! is_array( $data ) ) {
 			return new WP_Error( 'invalid_data', 'Dati non validi.', array( 'status' => 400 ) );
@@ -169,12 +179,11 @@ class Booking_REST_API {
 			return new WP_Error( 'rate_limit_exceeded', 'Troppi tentativi. Riprova più tardi.', array( 'status' => 429 ) );
 		}
 
-		// Verify nonce
-		/* $nonce = $request->get_header( 'X-WP-Nonce' );
-		if ( ! wp_verify_nonce( $nonce, 'booking_nonce' ) ) {
+		$nonce_check = self::verify_request_nonce( $request );
+		if ( is_wp_error( $nonce_check ) ) {
 			Booking_Security::increment_rate_limit();
-			return new WP_Error( 'invalid_nonce', 'Invalid nonce', array( 'status' => 403 ) );
-		} */
+			return $nonce_check;
+		}
 
 		// Verify reCAPTCHA if configured
 		$recaptcha_token = $request->get_param( 'recaptcha_token' );
@@ -260,7 +269,7 @@ class Booking_REST_API {
 			}
 			if( !$added ) {
 				Booking_DB::cancel_booking( $booking_id );
-				return new WP_Error( 'email_sending_failed', "errore nell'invio della mail", array( 'status' => 400 ) );
+				return new WP_Error( 'email_sending_failed', "Errore nella creazione dell'evento", array( 'status' => 400 ) );
 			}
 		}
 
@@ -385,5 +394,16 @@ class Booking_REST_API {
 			'message' => 'La prenotazione e stata riprogrammata correttamente.',
 			'booking' => Booking_DB::get_booking( $booking->id ),
 		);
+	}
+
+	private static function verify_request_nonce( $request ) {
+		$nonce = $request->get_header( 'X-WP-Nonce' );
+
+		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+			Booking_Logger::log_action( null, 'invalid_nonce', 'Invalid booking REST nonce', Booking_Security::get_client_ip() );
+			return new WP_Error( 'invalid_nonce', 'Sessione scaduta. Ricarica la pagina e riprova.', array( 'status' => 403 ) );
+		}
+
+		return true;
 	}
 }

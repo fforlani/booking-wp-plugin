@@ -70,10 +70,26 @@ class Booking_Shortcode {
 			true
 		);
 
+		$recaptcha_enabled  = Booking_Security::is_recaptcha_enabled();
+		$recaptcha_site_key = Booking_Settings::get( 'recaptcha_site_key', '' );
+		$form_script_deps   = array( 'jquery', 'booking-flatpickr', 'booking-bootstrap' );
+
+		if ( $recaptcha_enabled ) {
+			wp_enqueue_script(
+				'booking-google-recaptcha',
+				'https://www.google.com/recaptcha/api.js?render=' . rawurlencode( $recaptcha_site_key ),
+				array(),
+				null,
+				true
+			);
+
+			$form_script_deps[] = 'booking-google-recaptcha';
+		}
+
 		wp_enqueue_script(
 			'booking-form-script',
 			BOOKING_PLUGIN_URL . 'public/form-script.js',
-			array( 'jquery', 'booking-flatpickr', 'booking-bootstrap' ),
+			$form_script_deps,
 			BOOKING_PLUGIN_VERSION,
 			true
 		);
@@ -82,10 +98,13 @@ class Booking_Shortcode {
 			'booking-form-script',
 			'BookingData',
 			array(
-				'rest_url'     => rest_url( 'booking/v1/' ),
-				'nonce'        => wp_create_nonce( 'booking_nonce' ),
-				'site_url'     => site_url(),
-				'manage_token' => self::get_management_token_from_request(),
+				'rest_url'           => rest_url( 'booking/v1/' ),
+				'nonce'              => wp_create_nonce( 'wp_rest' ),
+				'site_url'           => site_url(),
+				'manage_token'       => self::get_management_token_from_request(),
+				'recaptcha_enabled'  => $recaptcha_enabled,
+				'recaptcha_site_key' => $recaptcha_enabled ? $recaptcha_site_key : '',
+				'recaptcha_action'   => 'booking_reserve',
 			)
 		);
 	}
@@ -107,7 +126,7 @@ class Booking_Shortcode {
 		?>
 		<div class="booking-form-container">
 			<div class="booking-form-header">
-				<p class="booking-form-kicker">Prenota il tuo appuntamento</p>
+				<p class="booking-form-kicker pb-0">Prenota il tuo appuntamento</p>
 				<h2 class="text-uppercase">Prenotazione prova taglie</h2>
 				<p>Scegli una data disponibile, seleziona l'orario e completa i dati richiesti.</p>
 			</div>
@@ -226,10 +245,10 @@ class Booking_Shortcode {
 							</div>
 						</div>
 
-						<div class="booking-privacy-box">
+						<div class="booking-privacy-box mb-2">
 							<label for="privacy-consent" class="booking-privacy-label">
 								<input type="checkbox" id="privacy-consent" name="privacy_consent" value="1" required />
-								<span>
+								<span class="text-dark">
 									Dichiaro di aver letto e accettato l'informativa sulla privacy e autorizzo il trattamento dei dati per la gestione della prenotazione.
 									<a href="<?php echo esc_url( $privacy_url ); ?>" target="_blank" rel="noopener noreferrer">Leggi l'informativa privacy</a>
 								</span>

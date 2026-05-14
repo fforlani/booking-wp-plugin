@@ -324,6 +324,36 @@ jQuery(document).ready(function($) {
 		});
 	}
 
+	function getBookingHeaders() {
+		return {
+			'Content-Type': 'application/json',
+			'X-WP-Nonce': BookingData.nonce || ''
+		};
+	}
+
+	function getRecaptchaToken() {
+		return new Promise(function(resolve, reject) {
+			if (!BookingData.recaptcha_enabled) {
+				resolve('');
+				return;
+			}
+
+			if (typeof grecaptcha === 'undefined' || !BookingData.recaptcha_site_key) {
+				reject(new Error('reCAPTCHA non disponibile. Ricarica la pagina e riprova.'));
+				return;
+			}
+
+			grecaptcha.ready(function() {
+				grecaptcha
+					.execute(BookingData.recaptcha_site_key, { action: BookingData.recaptcha_action || 'booking_reserve' })
+					.then(resolve)
+					.catch(function() {
+						reject(new Error('Verifica reCAPTCHA non riuscita. Riprova.'));
+					});
+			});
+		});
+	}
+
 	// Handle form submission
 	form.on('submit', function(e) {
 		e.preventDefault();
@@ -353,30 +383,39 @@ jQuery(document).ready(function($) {
 
 		showLoadingState();
 
-		$.ajax({
-			url: BookingData.rest_url + 'reserve',
-			type: 'POST',
-			data: JSON.stringify(formData),
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			success: function(response) {
-				if (response.success) {
-					showSuccessState(formData, response.message);
-				} else {
-					showFormState();
-					showErrorPopup('Errore durante la prenotazione. Riprova tra qualche istante.');
+		getRecaptchaToken()
+			.then(function(token) {
+				if (token) {
+					formData.recaptcha_token = token;
 				}
-			},
-			error: function(xhr) {
-				let errorMsg = 'Errore durante la prenotazione';
-				if (xhr.responseJSON && xhr.responseJSON.message) {
-					errorMsg = xhr.responseJSON.message;
-				}
+
+				$.ajax({
+					url: BookingData.rest_url + 'reserve',
+					type: 'POST',
+					data: JSON.stringify(formData),
+					headers: getBookingHeaders(),
+					success: function(response) {
+						if (response.success) {
+							showSuccessState(formData, response.message);
+						} else {
+							showFormState();
+							showErrorPopup('Errore durante la prenotazione. Riprova tra qualche istante.');
+						}
+					},
+					error: function(xhr) {
+						let errorMsg = 'Errore durante la prenotazione';
+						if (xhr.responseJSON && xhr.responseJSON.message) {
+							errorMsg = xhr.responseJSON.message;
+						}
+						showFormState();
+						showErrorPopup(errorMsg);
+					}
+				});
+			})
+			.catch(function(error) {
 				showFormState();
-				showErrorPopup(errorMsg);
-			}
-		});
+				showErrorPopup(error.message || 'Verifica reCAPTCHA non riuscita. Riprova.');
+			});
 	});
 
 	manageForm.on('submit', function(e) {
@@ -397,9 +436,7 @@ jQuery(document).ready(function($) {
 				booking_date: dateInput.val(),
 				time_slot: slotInput.val()
 			}),
-			headers: {
-				'Content-Type': 'application/json'
-			},
+			headers: getBookingHeaders(),
 			success: function(response) {
 				if (response.success) {
 					showManagementSuccess(response.message || 'La prenotazione e stata riprogrammata correttamente.');
@@ -516,9 +553,7 @@ jQuery(document).ready(function($) {
 			data: JSON.stringify({
 				token: managementToken
 			}),
-			headers: {
-				'Content-Type': 'application/json'
-			},
+			headers: getBookingHeaders(),
 			success: function(response) {
 				if (response.success) {
 					showManagementSuccess(response.message || 'La prenotazione e stata cancellata correttamente.');

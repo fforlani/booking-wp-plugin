@@ -128,9 +128,18 @@ class Booking_Admin {
 		register_setting( 'booking_system_group', 'booking_system_smtp_secure' );
 		register_setting( 'booking_system_group', 'booking_system_smtp_from_email' );
 		register_setting( 'booking_system_group', 'booking_system_smtp_from_name' );
-/* 		register_setting( 'booking_system_group', 'booking_system_enable_recaptcha' );
-		register_setting( 'booking_system_group', 'booking_system_recaptcha_site_key' );
-		register_setting( 'booking_system_group', 'booking_system_recaptcha_secret_key' ); */
+		register_setting( 'booking_system_group', 'booking_system_enable_recaptcha', array(
+			'sanitize_callback' => array( __CLASS__, 'sanitize_checkbox' ),
+		) );
+		register_setting( 'booking_system_group', 'booking_system_recaptcha_site_key', array(
+			'sanitize_callback' => 'sanitize_text_field',
+		) );
+		register_setting( 'booking_system_group', 'booking_system_recaptcha_secret_key', array(
+			'sanitize_callback' => 'sanitize_text_field',
+		) );
+		register_setting( 'booking_system_group', 'booking_system_recaptcha_threshold', array(
+			'sanitize_callback' => array( __CLASS__, 'sanitize_recaptcha_threshold' ),
+		) );
 
 		// Handle Google credentials upload
 		if ( isset( $_POST['booking_upload_credentials_nonce'] )) {
@@ -146,6 +155,24 @@ class Booking_Admin {
 			return '';
 		}
 		return sanitize_text_field( $value );
+	}
+
+	public static function sanitize_checkbox( $value ) {
+		return empty( $value ) ? 0 : 1;
+	}
+
+	public static function sanitize_recaptcha_threshold( $value ) {
+		$value = (float) $value;
+
+		if ( $value < 0 ) {
+			return 0;
+		}
+
+		if ( $value > 1 ) {
+			return 1;
+		}
+
+		return $value;
 	}
 
 	/**
@@ -672,8 +699,7 @@ class Booking_Admin {
 						</tr>
 					</table>
 
-					<!-- To be implemented in frontend if needed-->
-					<!-- <h3>Protezione reCAPTCHA v3</h3>
+					<h3>Protezione reCAPTCHA v3</h3>
 					<div class="notice notice-info">
 						<p><strong>reCAPTCHA v3</strong> protegge dal bot senza richiedere interazione dell'utente. Per configurarlo:</p>
 						<ol>
@@ -689,7 +715,8 @@ class Booking_Admin {
 								<label for="enable_recaptcha">Abilita reCAPTCHA:</label>
 							</th>
 							<td>
-								<input type="checkbox" id="enable_recaptcha" name="booking_system_enable_recaptcha" value="1" <?php checked( get_option( 'booking_system_enable_recaptcha' ) ); ?> />
+								<input type="hidden" name="booking_system_enable_recaptcha" value="0" />
+								<input type="checkbox" id="enable_recaptcha" name="booking_system_enable_recaptcha" value="1" <?php checked( $settings['enable_recaptcha'] ); ?> />
 								<p class="description">Abilita la protezione reCAPTCHA v3 sul form di prenotazione</p>
 							</td>
 						</tr>
@@ -698,7 +725,7 @@ class Booking_Admin {
 								<label for="recaptcha_site_key">Site Key reCAPTCHA:</label>
 							</th>
 							<td>
-								<input type="text" id="recaptcha_site_key" name="booking_system_recaptcha_site_key" value="<?php echo esc_attr( get_option( 'booking_system_recaptcha_site_key' ) ); ?>" placeholder="6Lc_..." style="width: 100%; font-family: monospace;" />
+								<input type="text" id="recaptcha_site_key" name="booking_system_recaptcha_site_key" value="<?php echo esc_attr( $settings['recaptcha_site_key'] ); ?>" placeholder="6Lc_..." style="width: 100%; font-family: monospace;" />
 								<p class="description">La chiave pubblica di reCAPTCHA (visibile lato client)</p>
 							</td>
 						</tr>
@@ -707,11 +734,20 @@ class Booking_Admin {
 								<label for="recaptcha_secret_key">Secret Key reCAPTCHA:</label>
 							</th>
 							<td>
-								<input type="password" id="recaptcha_secret_key" name="booking_system_recaptcha_secret_key" value="<?php echo esc_attr( get_option( 'booking_system_recaptcha_secret_key' ) ); ?>" placeholder="6Lc_..." style="width: 100%; font-family: monospace;" />
+								<input type="password" id="recaptcha_secret_key" name="booking_system_recaptcha_secret_key" value="<?php echo esc_attr( $settings['recaptcha_secret_key'] ); ?>" placeholder="6Lc_..." style="width: 100%; font-family: monospace;" />
 								<p class="description" style="color: #d63638;">⚠️ Non condividere questa chiave. Mantienila segreta!</p>
 							</td>
 						</tr>
-					</table> -->
+						<tr>
+							<th scope="row">
+								<label for="recaptcha_threshold">Soglia reCAPTCHA:</label>
+							</th>
+							<td>
+								<input type="number" id="recaptcha_threshold" name="booking_system_recaptcha_threshold" value="<?php echo esc_attr( $settings['recaptcha_threshold'] ); ?>" min="0" max="1" step="0.1" />
+								<p class="description">Soglia minima dello score v3. Valori piu alti sono piu restrittivi (default: 0.5).</p>
+							</td>
+						</tr>
+					</table>
 
 					<h3>Info Sicurezza</h3>
 					<div style="margin-top: 20px;">
