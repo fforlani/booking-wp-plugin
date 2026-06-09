@@ -29,6 +29,7 @@ function booking_get_defaults() {
 		// Email settings
 		'admin_email_on_booking'     => true,
 		'send_confirmation_email'    => true,
+		'bcc_email'                  => '',
 		'confirmation_email_template' => '',
 		'cancellation_email_template' => '',
 

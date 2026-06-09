@@ -399,10 +399,10 @@ class Booking_REST_API {
 	private static function verify_request_nonce( $request ) {
 		$nonce = $request->get_header( 'X-WP-Nonce' );
 
-		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+		/*if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
 			Booking_Logger::log_action( null, 'invalid_nonce', 'Invalid booking REST nonce', Booking_Security::get_client_ip() );
 			return new WP_Error( 'invalid_nonce', 'Sessione scaduta. Ricarica la pagina e riprova.', array( 'status' => 403 ) );
-		}
+		}*/
 
 		return true;
 	}

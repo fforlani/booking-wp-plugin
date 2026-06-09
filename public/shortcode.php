@@ -14,7 +14,7 @@ class Booking_Shortcode {
 	 */
 	public static function init() {
 		add_shortcode( 'booking_form', array( __CLASS__, 'render_form' ) );
-		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
+		//add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 	}
 
 	/**
@@ -113,6 +113,7 @@ class Booking_Shortcode {
 	 * Render booking form
 	 */
 	public static function render_form() {
+		self::enqueue_assets();
 		if ( self::is_management_request() ) {
 			return self::render_management_form();
 		}

@@ -110,6 +110,9 @@ class Booking_Admin {
 		register_setting( 'booking_system_group', 'booking_system_booking_timezone' );
 		register_setting( 'booking_system_group', 'booking_system_admin_email_on_booking' );
 		register_setting( 'booking_system_group', 'booking_system_send_confirmation_email' );
+		register_setting( 'booking_system_group', 'booking_system_bcc_email', array(
+			'sanitize_callback' => array( __CLASS__, 'sanitize_optional_email' ),
+		) );
 		register_setting( 'booking_system_group', 'booking_system_confirmation_email_template');
 		register_setting( 'booking_system_group', 'booking_system_cancellation_email_template');
 		register_setting( 'booking_system_group', 'booking_system_google_calendar_enabled' );
@@ -159,6 +162,15 @@ class Booking_Admin {
 
 	public static function sanitize_checkbox( $value ) {
 		return empty( $value ) ? 0 : 1;
+	}
+
+	public static function sanitize_optional_email( $value ) {
+		if ( empty( $value ) ) {
+			return '';
+		}
+
+		$email = sanitize_email( $value );
+		return is_email( $email ) ? $email : '';
 	}
 
 	public static function sanitize_recaptcha_threshold( $value ) {
@@ -562,7 +574,16 @@ class Booking_Admin {
 							</th>
 							<td>
 								<input type="checkbox" id="send_confirmation_email" name="booking_system_send_confirmation_email" value="1" <?php checked( $settings['send_confirmation_email'] ); ?> />
-								<p class="description">Invia email di conferma ai clienti e in ccn all'admin</p>
+								<p class="description">Invia email di conferma ai clienti. Se configurato, usa anche l'indirizzo CCN sotto.</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="bcc_email">Email CCN:</label>
+							</th>
+							<td>
+								<input type="email" id="bcc_email" name="booking_system_bcc_email" value="<?php echo esc_attr( $settings['bcc_email'] ); ?>" placeholder="segreteria@tuodominio.com" />
+								<p class="description">Indirizzo in copia conoscenza nascosta per email di conferma e cancellazione. Lascia vuoto per non inviare CCN.</p>
 							</td>
 						</tr>
 						<tr>

@@ -87,10 +87,7 @@ class Booking_Email {
 		}
 		$message = self::replace_tokens( $message, $booking );
 
-		$headers = array(
-			"Content-Type: text/html; charset=UTF-8",
-			"Bcc: " . get_option( 'admin_email' )
-		);
+		$headers = self::get_client_email_headers();
 
 		self::set_smtp();
 		$sent = wp_mail( $to, $subject, $message, $headers );
@@ -130,10 +127,7 @@ class Booking_Email {
 		$subject = 'Cancellazione Prenotazione';
 		$message = self::replace_tokens( $message, $booking );
 
-		$headers = array(
-			"Content-Type: text/html; charset=UTF-8",
-			"Bcc: " . get_option( 'admin_email' )
-		);
+		$headers = self::get_client_email_headers();
 
 		self::set_smtp();
 		$sent = wp_mail( $to, $subject, $message, $headers );
@@ -207,6 +201,22 @@ class Booking_Email {
 		);
 
 		return strtr( $template, $replacements );
+	}
+
+	/**
+	 * Get headers for client-facing emails.
+	 */
+	private static function get_client_email_headers() {
+		$headers = array(
+			'Content-Type: text/html; charset=UTF-8',
+		);
+
+		$bcc_email = Booking_Settings::get( 'bcc_email' );
+		if ( ! empty( $bcc_email ) && is_email( $bcc_email ) ) {
+			$headers[] = 'Bcc: ' . $bcc_email;
+		}
+
+		return $headers;
 	}
 
 	/**

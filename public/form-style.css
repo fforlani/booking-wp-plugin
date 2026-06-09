@@ -833,3 +833,11 @@
     letter-spacing: normal;
     font-weight: bold;
 }
+
+#booking-confirm-cancel-title h2, #booking-confirm-cancel-title h3 {
+	letter-spacing: normal;
+}
+
+body {
+	letter-spacing: normal !important;
+}
