@@ -183,6 +183,30 @@ class Booking_DB {
 	}
 
 	/**
+	 * Get bookings with pagination.
+	 */
+	public static function get_bookings( $limit = 20, $offset = 0 ) {
+		global $wpdb;
+
+		$query = $wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}bookings ORDER BY booking_date DESC, time_slot DESC LIMIT %d OFFSET %d",
+			intval( $limit ),
+			intval( $offset )
+		);
+
+		return $wpdb->get_results( $query );
+	}
+
+	/**
+	 * Count all bookings.
+	 */
+	public static function count_bookings() {
+		global $wpdb;
+
+		return intval( $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}bookings" ) );
+	}
+
+	/**
 	 * Count reservations for a specific slot
 	 */
 	public static function count_reservations_in_slot( $booking_date, $time_slot ) {
@@ -262,6 +286,15 @@ class Booking_DB {
 		);
 
 		return $wpdb->get_results( $query );
+	}
+
+	/**
+	 * Count all booking logs.
+	 */
+	public static function count_logs() {
+		global $wpdb;
+
+		return intval( $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}booking_logs" ) );
 	}
 
 	/**

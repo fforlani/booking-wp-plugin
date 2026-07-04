@@ -279,19 +279,28 @@ class Booking_Admin {
 			wp_die( 'Accesso negato' );
 		}
 
+		$return_args = array( 'page' => 'booking-bookings' );
+		if ( isset( $_GET['paged'] ) ) {
+			$return_args['paged'] = max( 1, absint( wp_unslash( $_GET['paged'] ) ) );
+		}
+		if ( isset( $_GET['per_page'] ) ) {
+			$return_args['per_page'] = min( 500, max( 1, absint( wp_unslash( $_GET['per_page'] ) ) ) );
+		}
+		$return_url = add_query_arg( $return_args, admin_url( 'admin.php' ) );
+
 		$booking_id = intval( $_GET['booking_id'] );
 		check_admin_referer( 'booking_cancel_booking_' . $booking_id );
 
 		$booking = Booking_DB::get_booking( $booking_id );
 		if ( ! $booking ) {
 			set_transient( 'booking_admin_error', 'Prenotazione non trovata.', 10 );
-			wp_safe_redirect( admin_url( 'admin.php?page=booking-bookings' ) );
+			wp_safe_redirect( $return_url );
 			exit;
 		}
 
 		if ( 'cancelled' === strtolower( (string) $booking->status ) ) {
 			set_transient( 'booking_admin_error', 'La prenotazione e gia cancellata.', 10 );
-			wp_safe_redirect( admin_url( 'admin.php?page=booking-bookings' ) );
+			wp_safe_redirect( $return_url );
 			exit;
 		}
 
@@ -301,7 +310,7 @@ class Booking_Admin {
 
 		if ( ! Booking_DB::cancel_booking( $booking->id ) ) {
 			set_transient( 'booking_admin_error', 'Non siamo riusciti a cancellare la prenotazione.', 10 );
-			wp_safe_redirect( admin_url( 'admin.php?page=booking-bookings' ) );
+			wp_safe_redirect( $return_url );
 			exit;
 		}
 
@@ -310,8 +319,94 @@ class Booking_Admin {
 		Booking_Email::send_cancellation( $booking );
 
 		set_transient( 'booking_admin_success', 'Prenotazione cancellata correttamente.', 10 );
-		wp_safe_redirect( admin_url( 'admin.php?page=booking-bookings' ) );
+		wp_safe_redirect( $return_url );
 		exit;
+	}
+
+	/**
+	 * Get pagination settings from admin query params.
+	 */
+	private static function get_pagination_args( $default_per_page = 20 ) {
+		$per_page = isset( $_GET['per_page'] ) ? absint( wp_unslash( $_GET['per_page'] ) ) : $default_per_page;
+		$per_page = min( 500, max( 1, $per_page ) );
+
+		$current_page = isset( $_GET['paged'] ) ? absint( wp_unslash( $_GET['paged'] ) ) : 1;
+		$current_page = max( 1, $current_page );
+
+		return array(
+			'per_page'     => $per_page,
+			'current_page' => $current_page,
+		);
+	}
+
+	/**
+	 * Render pagination and per-page controls for admin tables.
+	 */
+	private static function render_pagination_controls( $page_slug, $current_page, $per_page, $total_items, $label ) {
+		$total_pages = max( 1, (int) ceil( $total_items / $per_page ) );
+		$first_item  = $total_items > 0 ? ( ( $current_page - 1 ) * $per_page ) + 1 : 0;
+		$last_item   = min( $total_items, $current_page * $per_page );
+		$per_page_options = array( 10, 20, 50, 100, 200, 500 );
+		$page_placeholder = 999999999;
+
+		$pagination_links = paginate_links(
+			array(
+				'base'      => str_replace(
+					$page_placeholder,
+					'%#%',
+					esc_url(
+						add_query_arg(
+							array(
+								'page'     => $page_slug,
+								'per_page' => $per_page,
+								'paged'    => $page_placeholder,
+							),
+							admin_url( 'admin.php' )
+						)
+					)
+				),
+				'format'    => '',
+				'current'   => $current_page,
+				'total'     => $total_pages,
+				'prev_text' => '&laquo;',
+				'next_text' => '&raquo;',
+				'type'      => 'array',
+			)
+		);
+		?>
+		<div class="booking-pagination-controls">
+			<div class="booking-pagination-summary">
+				<?php
+				printf(
+					esc_html__( '%1$s: %2$d-%3$d di %4$d', 'booking-system' ),
+					esc_html( $label ),
+					intval( $first_item ),
+					intval( $last_item ),
+					intval( $total_items )
+				);
+				?>
+			</div>
+
+			<form method="get" class="booking-pagination-form">
+				<input type="hidden" name="page" value="<?php echo esc_attr( $page_slug ); ?>" />
+				<label>
+					<span>Record per pagina</span>
+					<select name="per_page">
+						<?php foreach ( $per_page_options as $option ) { ?>
+							<option value="<?php echo esc_attr( $option ); ?>" <?php selected( $per_page, $option ); ?>>
+								<?php echo esc_html( $option ); ?>
+							</option>
+						<?php } ?>
+					</select>
+				</label>
+				<label>
+					<span>Pagina</span>
+					<input type="number" name="paged" value="<?php echo esc_attr( $current_page ); ?>" min="1" max="<?php echo esc_attr( $total_pages ); ?>" />
+				</label>
+				<button type="submit" class="button">Applica</button>
+			</form>
+		</div>
+		<?php
 	}
 
 	/**
@@ -907,8 +1002,12 @@ class Booking_Admin {
 			wp_die( 'Accesso negato' );
 		}
 
-		global $wpdb;
-		$bookings = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}bookings ORDER BY booking_date DESC, time_slot DESC LIMIT 100" );
+		$pagination = self::get_pagination_args( 20 );
+		$total_bookings = Booking_DB::count_bookings();
+		$total_pages = max( 1, (int) ceil( $total_bookings / $pagination['per_page'] ) );
+		$current_page = min( $pagination['current_page'], $total_pages );
+		$offset = ( $current_page - 1 ) * $pagination['per_page'];
+		$bookings = Booking_DB::get_bookings( $pagination['per_page'], $offset );
 		$admin_error = get_transient( 'booking_admin_error' );
 		$admin_success = get_transient( 'booking_admin_success' );
 
@@ -930,9 +1029,7 @@ class Booking_Admin {
 				<?php delete_transient( 'booking_admin_success' ); ?>
 			<?php } ?>
 
-			<?php if ( ! empty( $bookings ) ) { ?>
-				<p>Totale prenotazioni: <strong><?php echo esc_html( count( $bookings ) ); ?></strong></p>
-			<?php } ?>
+			<?php self::render_pagination_controls( 'booking-bookings', $current_page, $pagination['per_page'], $total_bookings, 'Prenotazioni' ); ?>
 
 			<table class="widefat striped">
 				<thead>
@@ -974,6 +1071,8 @@ class Booking_Admin {
 										add_query_arg(
 											array(
 												'page'           => 'booking-bookings',
+												'paged'          => $current_page,
+												'per_page'       => $pagination['per_page'],
 												'booking_action' => 'cancel',
 												'booking_id'     => intval( $booking->id ),
 											),
@@ -998,6 +1097,8 @@ class Booking_Admin {
 				</tbody>
 			</table>
 
+			<?php self::render_pagination_controls( 'booking-bookings', $current_page, $pagination['per_page'], $total_bookings, 'Prenotazioni' ); ?>
+
 			<style>
 				.status-pending { color: #ffc107; font-weight: bold; }
 				.status-confirmed { color: #28a745; font-weight: bold; }
@@ -1015,11 +1116,18 @@ class Booking_Admin {
 			wp_die( 'Accesso negato' );
 		}
 
-		$logs = Booking_DB::get_logs( 150 );
+		$pagination = self::get_pagination_args( 20 );
+		$total_logs = Booking_DB::count_logs();
+		$total_pages = max( 1, (int) ceil( $total_logs / $pagination['per_page'] ) );
+		$current_page = min( $pagination['current_page'], $total_pages );
+		$offset = ( $current_page - 1 ) * $pagination['per_page'];
+		$logs = Booking_DB::get_logs( $pagination['per_page'], $offset );
 
 		?>
 		<div class="wrap">
 			<h1>Booking System - Log</h1>
+
+			<?php self::render_pagination_controls( 'booking-logs', $current_page, $pagination['per_page'], $total_logs, 'Log' ); ?>
 
 			<table class="widefat striped">
 				<thead>
@@ -1049,6 +1157,8 @@ class Booking_Admin {
 					<?php } ?>
 				</tbody>
 			</table>
+
+			<?php self::render_pagination_controls( 'booking-logs', $current_page, $pagination['per_page'], $total_logs, 'Log' ); ?>
 
 			<style>
 				.badge {
