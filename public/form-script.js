@@ -121,6 +121,7 @@ jQuery(document).ready(function($) {
 		dateInput.prop('disabled', true);
 		$.ajax({
 			url: BookingData.rest_url + 'dates',
+			cache: false,
 			type: 'GET',
 			data: { token: managementToken },
 			success: function(response) {
@@ -188,6 +189,7 @@ jQuery(document).ready(function($) {
 
 		$.ajax({
 			url: BookingData.rest_url + 'slots',
+			cache: false,
 			type: 'GET',
 			data: { date: date, token: managementToken },
 			success: function(response) {
